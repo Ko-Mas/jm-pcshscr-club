@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>กรอกแบบฟอร์มขอเปิดชุมนุม</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="navbar">
+  <button class="hamburger-btn" id="hamburgerBtn"><span></span><span></span><span></span></button>
+  <a class="navbar-brand" href="index.html"><img src="https://www.pcccr.ac.th/assets/img/logo.svg" style="width:24px;height:24px;object-fit:contain;vertical-align:middle;margin-right:6px" alt=""> PCSHSCR CLUB</a>
+  <a href="teacher-dashboard.html" class="btn btn-ghost btn-sm">← กลับ</a>
+</nav>
+
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<div class="drawer" id="sideDrawer">
+  <div class="drawer-header">
+    <span class="drawer-title">👩‍🏫 เมนูครู</span>
+    <button class="drawer-close">✕</button>
+  </div>
+  <ul class="drawer-nav">
+    <li><a href="teacher-dashboard.html"><span class="icon">🏠</span>หน้าหลัก</a></li>
+    <li><a href="teacher-form.html"><span class="icon">📝</span>กรอกแบบฟอร์มขอเปิดชุมนุม</a></li>
+    <li><a href="teacher-manage.html"><span class="icon">📋</span>จัดการข้อมูลชุมนุม</a></li>
+  </ul>
+</div>
+
+<div class="page-header">
+  <h2>📝 กรอกแบบฟอร์มขอเปิดชุมนุม</h2>
+</div>
+
+<div class="page-content" style="max-width:760px">
+  <form id="clubForm">
+
+    <!-- Section 1: Club Info -->
+    <div class="card mb-3">
+      <div class="section-title">📚 ข้อมูลรายวิชาชุมนุม</div>
+
+      <div class="form-group">
+        <label class="form-label">เลือกรอบที่ต้องการเปิดชุมนุม <span style="color:red">*</span></label>
+        <select class="form-control" id="roundId" required>
+          <option value="">-- กรุณาเลือกรอบ --</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">ชื่อชุมนุม <span style="color:red">*</span></label>
+        <input type="text" class="form-control" id="clubName" required placeholder="เช่น ชุมนุมดาราศาสตร์">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">คำอธิบาย</label>
+        <textarea class="form-control" id="description" placeholder="อธิบายกิจกรรมและวัตถุประสงค์ของชุมนุมโดยย่อ"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">ประเภทชุมนุม <span style="color:red">*</span></label>
+        <div style="display:flex;gap:1.5rem">
+          <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer">
+            <input type="radio" name="clubType" value="academic" required> วิชาการ
+          </label>
+          <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer">
+            <input type="radio" name="clubType" value="general"> ทั่วไป
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">สถานที่/ห้องเรียน <span style="color:red">*</span></label>
+        <select class="form-control" id="roomSelect" required>
+          <option value="">-- กรุณาเลือกห้องเรียน --</option>
+          <option value="ฟิสิกส์ 1">ฟิสิกส์ 1</option>
+          <option value="ฟิสิกส์ 2">ฟิสิกส์ 2</option>
+          <option value="เคมี 1">เคมี 1</option>
+          <option value="เคมี 2">เคมี 2</option>
+          <option value="ชีวะ 1">ชีวะ 1</option>
+          <option value="ชีวะ 2">ชีวะ 2</option>
+          <option value="ห้องคอม 1">ห้องคอม 1</option>
+          <option value="ห้องคอม 2">ห้องคอม 2</option>
+          <option value="ห้องเรียนรวม">ห้องเรียนรวม</option>
+          <option value="smart 1">smart 1</option>
+          <option value="smart 2">smart 2</option>
+          <option value="smart 3">smart 3</option>
+          <option value="จภ. 1">จภ. 1</option>
+          <option value="จภ. 2">จภ. 2</option>
+          <option value="จภ. 3">จภ. 3</option>
+          <option value="จภ. 4">จภ. 4</option>
+          <option value="FABLAB">FABLAB</option>
+          <option value="other">อื่นๆ (โปรดระบุ)</option>
+        </select>
+        <input type="text" class="form-control mt-1" id="roomOther" placeholder="โปรดระบุสถานที่/ห้องเรียน" style="display:none">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">หลักการและเหตุผล</label>
+        <textarea class="form-control" id="rationale" placeholder="อธิบายหลักการและเหตุผลในการขอเปิดชุมนุม"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">วัตถุประสงค์ (กดปุ่ม + เพื่อเพิ่มข้อ)</label>
+        <div class="dynamic-fields" id="objectivesList">
+          <div class="dynamic-field-row">
+            <input type="text" class="form-control" placeholder="วัตถุประสงค์ข้อที่ 1">
+          </div>
+        </div>
+        <button type="button" class="add-field-btn" id="addObjective">+ เพิ่มวัตถุประสงค์</button>
+      </div>
+    </div>
+
+    <!-- Section 2: Teachers & Conditions -->
+    <div class="card mb-3">
+      <div class="section-title">👩‍🏫 ข้อมูลคุณครูและเงื่อนไขการรับสมัคร</div>
+
+      <div class="form-group">
+        <label class="form-label">ชื่อครูที่ปรึกษาคนที่ 1 <span style="color:red">*</span></label>
+        <input type="text" class="form-control" id="teacher1" required placeholder="ชื่อ-นามสกุล">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">ชื่อครูที่ปรึกษาคนที่ 2 เป็นต้นไป</label>
+        <div class="dynamic-fields" id="teachersList"></div>
+        <button type="button" class="add-field-btn" id="addTeacher">+ เพิ่มครูที่ปรึกษา</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">เงื่อนไขการรับนักเรียนเข้าชุมนุม</label>
+        <div style="display:flex;flex-wrap:wrap;gap:0.75rem 1.5rem" id="gradeConditions">
+          <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+            <input type="checkbox" name="grades" value="0"> ไม่มีเงื่อนไข
+          </label>
+          <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+            <input type="checkbox" name="grades" value="1"> ม.1
+          </label>
+          <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+            <input type="checkbox" name="grades" value="2"> ม.2
+          </label>
+          <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+            <input type="checkbox" name="grades" value="3"> ม.3
+          </label>
+          <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+            <input type="checkbox" name="grades" value="4"> ม.4
+          </label>
+          <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+            <input type="checkbox" name="grades" value="5"> ม.5
+          </label>
+          <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+            <input type="checkbox" name="grades" value="6"> ม.6
+          </label>
+          <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+            <input type="checkbox" name="grades" value="other"> อื่นๆ (โปรดระบุ)
+          </label>
+        </div>
+        <input type="text" class="form-control mt-1" id="gradeOther" placeholder="ระบุเงื่อนไขเพิ่มเติม" style="display:none">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">จำนวนนักเรียนที่รับ (คำนวณอัตโนมัติ: จำนวนครู × 10)</label>
+        <input type="number" class="form-control" id="maxCapacity" min="1" placeholder="จำนวนนักเรียน">
+        <p class="text-muted mt-1" style="font-size:0.8rem">ปรับเปลี่ยนได้ตามต้องการ</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">รหัสเข้าชุมนุม (สำหรับครูเข้าแก้ไขข้อมูลในภายหลัง) <span style="color:red">*</span></label>
+        <input type="password" class="form-control" id="clubPassword" required placeholder="ตั้งรหัสลับสำหรับชุมนุมนี้">
+      </div>
+    </div>
+
+    <!-- Section 3: Pre-add Students -->
+    <div class="card mb-3">
+      <div class="section-title">🎒 เพิ่มรายชื่อนักเรียนล่วงหน้า (ไม่บังคับ)</div>
+
+      <div class="form-group">
+        <label class="form-label">กรองดูนักเรียนตามห้อง</label>
+        <select class="form-control" id="gradeFilter">
+          <option value="">-- เลือกระดับชั้น --</option>
+          <option value="1">ม.1</option>
+          <option value="2">ม.2</option>
+          <option value="3">ม.3</option>
+          <option value="4">ม.4</option>
+          <option value="5">ม.5</option>
+          <option value="6">ม.6</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ลำดับ</th>
+              <th>รหัสนักเรียน</th>
+              <th>ชื่อ-นามสกุล</th>
+              <th>ระดับชั้น</th>
+              <th>สถานะ</th>
+              <th>เพิ่ม</th>
+            </tr>
+          </thead>
+          <tbody id="studentsBody">
+            <tr><td colspan="6" class="text-center text-muted">เลือกระดับชั้นเพื่อดูรายชื่อนักเรียน</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="studentPagination"></div>
+
+      <div id="preAddedList" style="margin-top:1rem;display:none">
+        <div class="section-title">✅ นักเรียนที่เพิ่มล่วงหน้า</div>
+        <div id="preAddedChips" style="display:flex;flex-wrap:wrap;gap:0.5rem"></div>
+      </div>
+    </div>
+
+    <div class="flex justify-between" style="gap:1rem;flex-wrap:wrap">
+      <a href="teacher-dashboard.html" class="btn btn-ghost">ยกเลิก</a>
+      <button type="submit" class="btn btn-primary btn-lg">✅ ยืนยันการเปิดชุมนุม</button>
+    </div>
+
+  </form>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+<script>
+requireRole('teacher', 'teacher-login.html');
+initDrawer();
+
+let preAddedStudents = {}; // studentId → student data
+let allStudentsData  = [];
+
+// ── Load rounds for dropdown ─────────────────────────────────
+async function loadRounds() {
+  const snap = await db.collection(COL.ROUNDS)
+    .where('teacherEditOpen', '==', true)
+    .orderBy('createdAt', 'desc').get();
+  const sel = document.getElementById('roundId');
+  if (snap.empty) {
+    sel.innerHTML = '<option value="">ไม่มีรอบที่เปิดรับ</option>';
+    return;
+  }
+  snap.docs.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = d.data().name;
+    sel.appendChild(opt);
+  });
+}
+
+// ── Dynamic objectives ───────────────────────────────────────
+document.getElementById('addObjective').addEventListener('click', () => {
+  const list  = document.getElementById('objectivesList');
+  const count = list.children.length + 1;
+  const row   = document.createElement('div');
+  row.className = 'dynamic-field-row';
+  row.innerHTML = `
+    <input type="text" class="form-control" placeholder="วัตถุประสงค์ข้อที่ ${count}">
+    <button type="button" class="remove-field-btn" onclick="this.parentElement.remove()">✕</button>`;
+  list.appendChild(row);
+});
+
+// ── Dynamic teachers ─────────────────────────────────────────
+let teacherCount = 2;
+document.getElementById('addTeacher').addEventListener('click', () => {
+  const list = document.getElementById('teachersList');
+  const row  = document.createElement('div');
+  row.className = 'dynamic-field-row';
+  row.innerHTML = `
+    <input type="text" class="form-control" placeholder="ชื่อครูที่ปรึกษาคนที่ ${teacherCount++}">
+    <button type="button" class="remove-field-btn" onclick="this.parentElement.remove(); updateCapacity()">✕</button>`;
+  list.appendChild(row);
+  updateCapacity();
+});
+
+function updateCapacity() {
+  const teacherCount = 1 + document.getElementById('teachersList').children.length;
+  document.getElementById('maxCapacity').value = teacherCount * 10;
+}
+
+document.getElementById('teacher1').addEventListener('input', updateCapacity);
+updateCapacity();
+
+// ── Room dropdown ────────────────────────────────────────────
+document.getElementById('roomSelect').addEventListener('change', function() {
+  const other = document.getElementById('roomOther');
+  const isOther = this.value === 'other';
+  other.style.display = isOther ? '' : 'none';
+  other.required = isOther;
+});
+
+// ── Grade conditions ─────────────────────────────────────────
+document.querySelectorAll('input[name="grades"]').forEach(cb => {
+  cb.addEventListener('change', () => {
+    const hasOther = document.querySelector('input[name="grades"][value="other"]')?.checked;
+    document.getElementById('gradeOther').style.display = hasOther ? '' : 'none';
+  });
+});
+
+// ── Load students by grade ───────────────────────────────────
+document.getElementById('gradeFilter').addEventListener('change', async function() {
+  const grade = this.value;
+  if (!grade) return;
+  const snap = await db.collection(COL.STUDENTS).where('grade', '==', parseInt(grade)).orderBy('firstName').get();
+  allStudentsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderStudentTable();
+});
+
+function renderStudentTable() {
+  const paginator = createPaginator(allStudentsData, 20, (items, container) => {
+    if (!items.length) {
+      container.innerHTML = '<tr><td colspan="6" class="text-center text-muted">ไม่พบนักเรียน</td></tr>';
+      return;
+    }
+    container.innerHTML = items.map((s, i) => {
+      const isAdded = !!preAddedStudents[s.studentId];
+      return `<tr>
+        <td>${i+1}</td>
+        <td>${escHtml(s.studentId)}</td>
+        <td>${escHtml(s.firstName)} ${escHtml(s.lastName)}</td>
+        <td>${gradeLabel(s.grade)}</td>
+        <td>${s.currentClub ? `<span class="badge badge-orange">${escHtml(s.currentClub)}</span>` : '<span class="badge badge-gray">ยังไม่ได้ลง</span>'}</td>
+        <td>
+          <button type="button" class="btn btn-sm ${isAdded?'btn-danger':'btn-success'}"
+            onclick="togglePreAdd('${s.studentId}')">
+            ${isAdded ? '✕ ลบ' : '+ เพิ่ม'}
+          </button>
+        </td>
+      </tr>`;
+    }).join('');
+  }, container => document.getElementById('studentsBody'));
+  paginator.render(document.getElementById('studentsBody'), document.getElementById('studentPagination'));
+}
+
+function togglePreAdd(studentId) {
+  const s = allStudentsData.find(x => x.studentId === studentId);
+  if (!s) return;
+  if (preAddedStudents[studentId]) {
+    delete preAddedStudents[studentId];
+  } else {
+    preAddedStudents[studentId] = s;
+  }
+  renderPreAddedChips();
+  renderStudentTable();
+}
+
+function renderPreAddedChips() {
+  const students = Object.values(preAddedStudents);
+  const wrap  = document.getElementById('preAddedList');
+  const chips = document.getElementById('preAddedChips');
+  wrap.style.display = students.length ? '' : 'none';
+  chips.innerHTML = students.map(s =>
+    `<span class="badge badge-mint" style="background:var(--mint-light);color:#2E7D66;border:1px solid var(--mint)">
+      ${escHtml(s.firstName)} ${escHtml(s.lastName)}
+      <button type="button" onclick="togglePreAdd('${s.studentId}')" style="background:none;border:none;cursor:pointer;margin-left:4px">✕</button>
+    </span>`
+  ).join('');
+}
+
+// ── Form Submit ──────────────────────────────────────────────
+document.getElementById('clubForm').addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const roundId = document.getElementById('roundId').value;
+  if (!roundId) { showToast('กรุณาเลือกรอบลงทะเบียน', 'error'); return; }
+
+  // Room conflict check
+  const roomVal = document.getElementById('roomSelect').value === 'other'
+    ? document.getElementById('roomOther').value.trim()
+    : document.getElementById('roomSelect').value;
+  if (roomVal) {
+    const conflictSnap = await db.collection(COL.CLUBS)
+      .where('roundId', '==', roundId)
+      .where('room', '==', roomVal)
+      .limit(1).get();
+    if (!conflictSnap.empty) {
+      const conflictName = conflictSnap.docs[0].data().name;
+      await showAlert({
+        title: 'ห้องเรียนถูกจองแล้ว',
+        body: `ห้อง "<strong>${escHtml(roomVal)}</strong>" ถูกใช้งานโดยชุมนุม "<strong>${escHtml(conflictName)}</strong>" ในรอบนี้แล้ว<br>กรุณาเลือกห้องอื่น`,
+        icon: '⚠️'
+      });
+      return;
+    }
+  }
+
+  const confirmed = await showConfirm({
+    title: 'ยืนยันการเปิดชุมนุม',
+    body: 'คุณต้องการยื่นคำขอเปิดชุมนุมนี้ใช่หรือไม่?',
+    confirmText: 'ยืนยัน',
+    type: 'success'
+  });
+  if (!confirmed) return;
+
+  const submitBtn = document.querySelector('[type="submit"]');
+  submitBtn.disabled = true; submitBtn.textContent = 'กำลังบันทึก...';
+
+  try {
+    const objectives = [...document.getElementById('objectivesList').querySelectorAll('input')]
+      .map(i => i.value.trim()).filter(Boolean);
+    const extraTeachers = [...document.getElementById('teachersList').querySelectorAll('input')]
+      .map(i => i.value.trim()).filter(Boolean);
+    const teachers = [document.getElementById('teacher1').value.trim(), ...extraTeachers].filter(Boolean);
+    const grades = [...document.querySelectorAll('input[name="grades"]:checked')].map(c => c.value);
+
+    const clubData = {
+      roundId,
+      name:        document.getElementById('clubName').value.trim(),
+      description: document.getElementById('description').value.trim(),
+      type:        document.querySelector('input[name="clubType"]:checked')?.value || 'general',
+      room:        document.getElementById('roomSelect').value === 'other'
+                     ? document.getElementById('roomOther').value.trim()
+                     : document.getElementById('roomSelect').value,
+      rationale:   document.getElementById('rationale').value.trim(),
+      objectives,
+      teachers,
+      gradeConditions: grades,
+      gradeOther:  document.getElementById('gradeOther').value.trim(),
+      maxCapacity: parseInt(document.getElementById('maxCapacity').value) || teachers.length * 10,
+      password:    document.getElementById('clubPassword').value,
+      enrolled:    0,
+      preAddedStudents: Object.keys(preAddedStudents),
+      status: 'pending',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    const docRef = await db.collection(COL.CLUBS).add(clubData);
+
+    // Pre-add students to registrations
+    const preAdded = Object.values(preAddedStudents);
+    for (const s of preAdded) {
+      await db.collection(COL.REGISTRATIONS).add({
+        studentId: s.studentId,
+        studentName: `${s.firstName} ${s.lastName}`,
+        grade: s.grade,
+        roundId,
+        clubs: [{ id: docRef.id, name: clubData.name, type: clubData.type }],
+        preAddedByTeacher: true,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    if (preAdded.length > 0) {
+      await db.collection(COL.CLUBS).doc(docRef.id).update({ enrolled: preAdded.length });
+    }
+
+    await writeAuditLog('create_club', COL.CLUBS, docRef.id, { name: clubData.name });
+    await showAlert({ title:'ยื่นคำขอสำเร็จ!', body:'ข้อมูลชุมนุมถูกส่งเข้าระบบแล้ว รอการอนุมัติจากแอดมิน', icon:'✅' });
+    window.location.href = 'teacher-dashboard.html';
+
+  } catch (err) {
+    showToast('เกิดข้อผิดพลาด: ' + err.message, 'error');
+  } finally {
+    submitBtn.disabled = false; submitBtn.textContent = '✅ ยืนยันการเปิดชุมนุม';
+  }
+});
+
+loadRounds();
+</script>
+</body>
+</html>

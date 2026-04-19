@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>แดชบอร์ดคุณครู</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .menu-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
+  .menu-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 2rem;
+    text-align: center;
+    border: 2px solid var(--border);
+    cursor: pointer;
+    text-decoration: none;
+    color: var(--text);
+    transition: all 0.2s;
+    display: block;
+  }
+  .menu-card:hover { border-color: var(--blue-dark); box-shadow: 0 8px 30px rgba(126,200,255,0.15); transform: translateY(-3px); }
+  .menu-card .icon { font-size: 3rem; margin-bottom: 1rem; }
+  .menu-card h3 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+  .menu-card p { color: var(--text-light); font-size: 0.88rem; }
+</style>
+</head>
+<body>
+<nav class="navbar">
+  <button class="hamburger-btn" id="hamburgerBtn"><span></span><span></span><span></span></button>
+  <a class="navbar-brand" href="index.html"><img src="https://www.pcccr.ac.th/assets/img/logo.svg" style="width:24px;height:24px;object-fit:contain;vertical-align:middle;margin-right:6px" alt=""> PCSHSCR CLUB</a>
+  <button class="btn btn-ghost btn-sm" id="logoutBtn">ออกจากระบบ</button>
+</nav>
+
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<div class="drawer" id="sideDrawer">
+  <div class="drawer-header">
+    <span class="drawer-title">👩‍🏫 เมนูครู</span>
+    <button class="drawer-close">✕</button>
+  </div>
+  <ul class="drawer-nav">
+    <li><a href="teacher-dashboard.html"><span class="icon">🏠</span>หน้าหลัก</a></li>
+    <li><a href="teacher-form.html"><span class="icon">📝</span>กรอกแบบฟอร์มขอเปิดชุมนุม</a></li>
+    <li><a href="teacher-manage.html"><span class="icon">📋</span>จัดการข้อมูลชุมนุม</a></li>
+    <li><a href="index.html"><span class="icon">↩</span>กลับหน้าแรก</a></li>
+  </ul>
+</div>
+
+<div class="page-content" style="max-width:800px">
+  <div style="text-align:center; padding: 3rem 0 1rem;">
+    <div style="font-size:3.5rem; margin-bottom:0.75rem">👩‍🏫</div>
+    <h2 style="color:var(--blue-dark)">ยินดีต้อนรับ คุณครู</h2>
+    <p class="text-muted" style="margin-top:0.5rem">ระบบจัดการชุมนุม PCSHSCR – เลือกรายการที่ต้องการ</p>
+  </div>
+
+  <div class="menu-cards">
+    <a href="teacher-form.html" class="menu-card">
+      <div class="icon">📝</div>
+      <h3>กรอกแบบฟอร์มขอเปิดชุมนุม</h3>
+      <p>ยื่นคำขอเปิดชุมนุมใหม่สำหรับภาคเรียนปัจจุบัน</p>
+    </a>
+    <a href="teacher-manage.html" class="menu-card">
+      <div class="icon">📋</div>
+      <h3>จัดการข้อมูลชุมนุม</h3>
+      <p>แก้ไขรายชื่อนักเรียน ดาวน์โหลดรายงาน และจัดการชุมนุมของคุณ</p>
+    </a>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+<script>
+requireRole('teacher', 'teacher-login.html');
+initDrawer();
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  if (await showConfirm({ title:'ออกจากระบบ', body:'คุณต้องการออกจากระบบใช่หรือไม่?', type:'warning' })) {
+    clearSession(); window.location.href = 'teacher-login.html';
+  }
+});
+</script>
+</body>
+</html>

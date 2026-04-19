@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>จัดการข้อมูลชุมนุม</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="navbar">
+  <button class="hamburger-btn" id="hamburgerBtn"><span></span><span></span><span></span></button>
+  <a class="navbar-brand" href="index.html"><img src="https://www.pcccr.ac.th/assets/img/logo.svg" style="width:24px;height:24px;object-fit:contain;vertical-align:middle;margin-right:6px" alt=""> PCSHSCR CLUB</a>
+  <a href="teacher-dashboard.html" class="btn btn-ghost btn-sm">← กลับ</a>
+</nav>
+
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<div class="drawer" id="sideDrawer">
+  <div class="drawer-header">
+    <span class="drawer-title">👩‍🏫 เมนูครู</span>
+    <button class="drawer-close">✕</button>
+  </div>
+  <ul class="drawer-nav">
+    <li><a href="teacher-dashboard.html"><span class="icon">🏠</span>หน้าหลัก</a></li>
+    <li><a href="teacher-form.html"><span class="icon">📝</span>กรอกแบบฟอร์มขอเปิดชุมนุม</a></li>
+  </ul>
+</div>
+
+<!-- Auth Gate -->
+<div id="authGate" class="login-wrap" style="background:linear-gradient(135deg,#E8F8FF,#FFF0F5)">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="logo-circle">🔑</div>
+      <h2>ยืนยันตัวตนเข้าชุมนุม</h2>
+      <p>กรอกชื่อชุมนุมและรหัสผ่านของชุมนุมเพื่อเข้าจัดการ</p>
+    </div>
+    <div class="error-msg" id="authError">ชื่อชุมนุมหรือรหัสผ่านไม่ถูกต้อง</div>
+    <div class="form-group">
+      <label class="form-label">ชื่อชุมนุม <span style="color:red">*</span></label>
+      <input type="text" class="form-control" id="authClubName" placeholder="กรอกชื่อชุมนุมที่ต้องการจัดการ">
+    </div>
+    <div class="form-group">
+      <label class="form-label">รหัสผ่านเข้าชุมนุม <span style="color:red">*</span></label>
+      <input type="password" class="form-control" id="authClubPass" placeholder="รหัสผ่านที่ตั้งไว้ตอนสร้างชุมนุม">
+    </div>
+    <button class="btn btn-secondary btn-block btn-lg" id="authBtn">เข้าจัดการชุมนุม</button>
+  </div>
+</div>
+
+<!-- Management Panel (hidden until auth) -->
+<div id="managementPanel" style="display:none">
+  <div class="page-header">
+    <div>
+      <h2>📋 จัดการข้อมูลชุมนุม</h2>
+      <p class="text-muted" id="clubNameDisplay"></p>
+    </div>
+    <button class="btn btn-primary" id="saveBtn">💾 บันทึกข้อมูล</button>
+  </div>
+
+  <div class="page-content" style="max-width:900px">
+
+    <!-- Read-only info -->
+    <div class="card mb-3">
+      <div class="section-title">📚 ข้อมูลชุมนุม (อ่านอย่างเดียว)</div>
+      <div id="readonlyInfo" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;font-size:0.9rem"></div>
+    </div>
+
+    <!-- Editable fields -->
+    <div class="card mb-3">
+      <div class="section-title">✏️ ส่วนที่แก้ไขได้</div>
+
+      <div class="form-group">
+        <label class="form-label">สถานที่/ห้องเรียน</label>
+        <select class="form-control" id="editRoom" style="max-width:360px">
+          <option value="">-- กรุณาเลือกห้องเรียน --</option>
+          <option value="ฟิสิกส์ 1">ฟิสิกส์ 1</option>
+          <option value="ฟิสิกส์ 2">ฟิสิกส์ 2</option>
+          <option value="เคมี 1">เคมี 1</option>
+          <option value="เคมี 2">เคมี 2</option>
+          <option value="ชีวะ 1">ชีวะ 1</option>
+          <option value="ชีวะ 2">ชีวะ 2</option>
+          <option value="ห้องคอม 1">ห้องคอม 1</option>
+          <option value="ห้องคอม 2">ห้องคอม 2</option>
+          <option value="ห้องเรียนรวม">ห้องเรียนรวม</option>
+          <option value="smart 1">smart 1</option>
+          <option value="smart 2">smart 2</option>
+          <option value="smart 3">smart 3</option>
+          <option value="จภ. 1">จภ. 1</option>
+          <option value="จภ. 2">จภ. 2</option>
+          <option value="จภ. 3">จภ. 3</option>
+          <option value="จภ. 4">จภ. 4</option>
+          <option value="FABLAB">FABLAB</option>
+          <option value="other">อื่นๆ (โปรดระบุ)</option>
+        </select>
+        <input type="text" class="form-control mt-1" id="editRoomOther" placeholder="โปรดระบุสถานที่/ห้องเรียน" style="display:none;max-width:360px">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">จำนวนนักเรียนที่รับ</label>
+        <input type="number" class="form-control" id="editMaxCapacity" min="1" style="max-width:200px">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">เปลี่ยนรหัสผ่านชุมนุม (เว้นว่างถ้าไม่เปลี่ยน)</label>
+        <input type="password" class="form-control" id="editPassword" placeholder="รหัสผ่านใหม่" style="max-width:300px">
+      </div>
+    </div>
+
+    <!-- Student List -->
+    <div class="card mb-3">
+      <div class="section-title">🎒 รายชื่อนักเรียน</div>
+
+      <div class="search-bar mb-2">
+        <div class="search-input-wrap">
+          <span>🔍</span>
+          <input type="text" id="studentSearch" placeholder="ค้นหานักเรียน...">
+        </div>
+        <select class="filter-select" id="gradeFilter">
+          <option value="">ทุกระดับชั้น</option>
+          <option value="1">ม.1</option><option value="2">ม.2</option>
+          <option value="3">ม.3</option><option value="4">ม.4</option>
+          <option value="5">ม.5</option><option value="6">ม.6</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom:1rem">
+        <button class="btn btn-success btn-sm" id="addStudentToggle">+ เพิ่มนักเรียน</button>
+        <button class="btn btn-secondary btn-sm" id="exportBtn">📥 ดาวน์โหลดรายชื่อ Excel</button>
+      </div>
+
+      <!-- Add student panel -->
+      <div id="addStudentPanel" style="display:none;background:var(--blue-light);padding:1rem;border-radius:var(--radius-sm);margin-bottom:1rem">
+        <div class="form-group mb-1">
+          <input type="text" class="form-control" id="searchAllStudents" placeholder="ค้นหาชื่อนักเรียนที่ต้องการเพิ่ม...">
+        </div>
+        <div id="searchResults" style="max-height:200px;overflow-y:auto"></div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>#</th><th>รหัสนักเรียน</th><th>ชื่อ-นามสกุล</th><th>ระดับชั้น</th><th>ลบ</th></tr>
+          </thead>
+          <tbody id="memberBody">
+            <tr><td colspan="5" class="text-center"><div class="spinner"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="memberPagination"></div>
+    </div>
+
+    <div class="flex justify-between flex-wrap gap-1">
+      <a href="teacher-dashboard.html" class="btn btn-ghost">← กลับ</a>
+      <button class="btn btn-primary btn-lg" id="saveBtn2">💾 บันทึกข้อมูล</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<!-- SheetJS for Excel export -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+<script>
+requireRole('teacher', 'teacher-login.html');
+initDrawer();
+
+let clubDocId = null;
+let clubData  = null;
+let members   = []; // Array of {studentId, firstName, lastName, grade, regDocId}
+let allSystemStudents = [];
+
+// ── Auth Gate ────────────────────────────────────────────────
+document.getElementById('authBtn').addEventListener('click', async () => {
+  const name = document.getElementById('authClubName').value.trim();
+  const pass = document.getElementById('authClubPass').value;
+  document.getElementById('authError').classList.remove('show');
+  if (!name || !pass) return;
+
+  const snap = await db.collection(COL.CLUBS)
+    .where('name', '==', name)
+    .where('password', '==', pass)
+    .limit(1).get();
+
+  if (snap.empty) {
+    document.getElementById('authError').classList.add('show');
+    return;
+  }
+  clubDocId = snap.docs[0].id;
+  clubData  = snap.docs[0].data();
+  document.getElementById('authGate').style.display = 'none';
+  document.getElementById('managementPanel').style.display = '';
+  loadPanel();
+});
+
+async function loadPanel() {
+  document.getElementById('clubNameDisplay').textContent = clubData.name;
+  document.getElementById('editMaxCapacity').value = clubData.maxCapacity || 30;
+
+  // Populate room dropdown
+  const roomSel   = document.getElementById('editRoom');
+  const roomOther = document.getElementById('editRoomOther');
+  const knownRooms = [...roomSel.options].map(o => o.value).filter(v => v && v !== 'other');
+  if (clubData.room && knownRooms.includes(clubData.room)) {
+    roomSel.value = clubData.room;
+  } else if (clubData.room) {
+    roomSel.value = 'other';
+    roomOther.style.display = '';
+    roomOther.value = clubData.room;
+  }
+  roomSel.addEventListener('change', function() {
+    const isOther = this.value === 'other';
+    roomOther.style.display = isOther ? '' : 'none';
+  });
+
+  // Readonly info
+  document.getElementById('readonlyInfo').innerHTML = `
+    <div><strong>ชื่อชุมนุม:</strong> ${escHtml(clubData.name)}</div>
+    <div><strong>ประเภท:</strong> ${clubData.type === 'academic' ? 'วิชาการ' : 'ทั่วไป'}</div>
+    <div><strong>สถานที่:</strong> ${escHtml(clubData.room || '-')}</div>
+    <div><strong>ครูที่ปรึกษา:</strong> ${escHtml((clubData.teachers || []).join(', '))}</div>
+    <div><strong>หลักการ:</strong> ${escHtml(clubData.rationale || '-')}</div>
+    <div><strong>รอบ:</strong> ${escHtml(clubData.roundId || '-')}</div>`;
+
+  // Load members from registrations
+  const regSnap = await db.collection(COL.REGISTRATIONS)
+    .where('roundId', '==', clubData.roundId)
+    .get();
+  members = [];
+  regSnap.docs.forEach(doc => {
+    const r = doc.data();
+    if (r.clubs?.some(c => c.id === clubDocId)) {
+      members.push({
+        studentId: r.studentId,
+        firstName: r.studentName?.split(' ')[0] || '',
+        lastName:  r.studentName?.split(' ').slice(1).join(' ') || '',
+        grade:     r.grade,
+        regDocId:  doc.id
+      });
+    }
+  });
+  renderMembers();
+
+  // Load all students for search
+  const allSnap = await db.collection(COL.STUDENTS).get();
+  allSystemStudents = allSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+function renderMembers() {
+  const search = document.getElementById('studentSearch').value.toLowerCase();
+  const grade  = document.getElementById('gradeFilter').value;
+  const filtered = members.filter(m =>
+    (!grade || String(m.grade) === grade) &&
+    (!search || `${m.firstName} ${m.lastName} ${m.studentId}`.toLowerCase().includes(search))
+  );
+  const paginator = createPaginator(filtered, 25, (items, tbody) => {
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">ไม่พบรายชื่อ</td></tr>';
+      return;
+    }
+    tbody.innerHTML = items.map((m, i) => `
+      <tr>
+        <td>${i+1}</td>
+        <td>${escHtml(m.studentId)}</td>
+        <td>${escHtml(m.firstName)} ${escHtml(m.lastName)}</td>
+        <td>${gradeLabel(m.grade)}</td>
+        <td>
+          <button class="btn btn-danger btn-sm" onclick="removeMember('${m.studentId}','${m.regDocId}')">✕ ลบ</button>
+        </td>
+      </tr>`).join('');
+  });
+  paginator.render(document.getElementById('memberBody'), document.getElementById('memberPagination'));
+}
+
+async function removeMember(studentId, regDocId) {
+  const ok = await showConfirm({ title:'ลบรายชื่อนักเรียน', body:`คุณต้องการลบนักเรียนรหัส <strong>${studentId}</strong> ออกจากชุมนุมนี้ใช่หรือไม่?`, type:'danger', confirmText:'ลบ' });
+  if (!ok) return;
+  try {
+    const regDoc = await db.collection(COL.REGISTRATIONS).doc(regDocId).get();
+    const clubs = regDoc.data()?.clubs || [];
+    const updatedClubs = clubs.filter(c => c.id !== clubDocId);
+    if (updatedClubs.length === 0) {
+      await db.collection(COL.REGISTRATIONS).doc(regDocId).delete();
+    } else {
+      await db.collection(COL.REGISTRATIONS).doc(regDocId).update({ clubs: updatedClubs });
+    }
+    await db.collection(COL.CLUBS).doc(clubDocId).update({ enrolled: firebase.firestore.FieldValue.increment(-1) });
+    await writeAuditLog('remove_student_from_club', COL.CLUBS, clubDocId, { studentId });
+    members = members.filter(m => m.studentId !== studentId);
+    renderMembers();
+    showToast('ลบรายชื่อนักเรียนสำเร็จ', 'success');
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+// Add student search
+document.getElementById('addStudentToggle').addEventListener('click', () => {
+  const panel = document.getElementById('addStudentPanel');
+  panel.style.display = panel.style.display === 'none' ? '' : 'none';
+});
+
+document.getElementById('searchAllStudents').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  const results = document.getElementById('searchResults');
+  if (q.length < 2) { results.innerHTML = ''; return; }
+  const matches = allSystemStudents.filter(s =>
+    `${s.firstName} ${s.lastName} ${s.studentId}`.toLowerCase().includes(q)
+  ).slice(0, 10);
+  results.innerHTML = matches.map(s => `
+    <div style="padding:0.5rem;cursor:pointer;border-radius:4px;display:flex;justify-content:space-between;align-items:center;background:white;margin-bottom:4px"
+      onclick="addMember('${s.studentId}','${s.id}')">
+      <span>${escHtml(s.firstName)} ${escHtml(s.lastName)} (${escHtml(s.studentId)}) – ${gradeLabel(s.grade)}</span>
+      <button class="btn btn-success btn-sm">+ เพิ่ม</button>
+    </div>`).join('') || '<p class="text-muted" style="padding:0.5rem">ไม่พบนักเรียน</p>';
+});
+
+async function addMember(studentId, docId) {
+  if (members.find(m => m.studentId === studentId)) {
+    showToast('นักเรียนคนนี้อยู่ในชุมนุมนี้แล้ว', 'warning'); return;
+  }
+  // Check if already in another club this round
+  const regSnap = await db.collection(COL.REGISTRATIONS)
+    .where('studentId', '==', studentId)
+    .where('roundId', '==', clubData.roundId).get();
+  if (!regSnap.empty) {
+    const existing = regSnap.docs[0].data();
+    if (existing.clubs?.some(c => c.id !== clubDocId)) {
+      showToast('นักเรียนคนนี้ลงทะเบียนชุมนุมอื่นในรอบนี้แล้ว ต้องลบออกก่อน', 'error'); return;
+    }
+  }
+  const sData = allSystemStudents.find(s => s.studentId === studentId);
+  if (!sData) return;
+  await db.collection(COL.REGISTRATIONS).add({
+    studentId, studentName: `${sData.firstName} ${sData.lastName}`,
+    grade: sData.grade, roundId: clubData.roundId,
+    clubs: [{ id: clubDocId, name: clubData.name, type: clubData.type }],
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  await db.collection(COL.CLUBS).doc(clubDocId).update({ enrolled: firebase.firestore.FieldValue.increment(1) });
+  await writeAuditLog('add_student_to_club', COL.CLUBS, clubDocId, { studentId });
+  members.push({ studentId, firstName: sData.firstName, lastName: sData.lastName, grade: sData.grade, regDocId: 'temp' });
+  renderMembers();
+  showToast('เพิ่มนักเรียนสำเร็จ', 'success');
+}
+
+// Save changes
+async function saveChanges() {
+  const ok = await showConfirm({ title:'บันทึกข้อมูล', body:'ยืนยันการบันทึกการเปลี่ยนแปลงใช่หรือไม่?', type:'success', confirmText:'บันทึก' });
+  if (!ok) return;
+  const roomSel = document.getElementById('editRoom');
+  const newRoom = roomSel.value === 'other'
+    ? document.getElementById('editRoomOther').value.trim()
+    : roomSel.value;
+  const updates = {
+    maxCapacity: parseInt(document.getElementById('editMaxCapacity').value),
+    ...(newRoom && { room: newRoom })
+  };
+  const newPass = document.getElementById('editPassword').value;
+  if (newPass) updates.password = newPass;
+  await db.collection(COL.CLUBS).doc(clubDocId).update(updates);
+  await writeAuditLog('update_club', COL.CLUBS, clubDocId, updates);
+  showToast('บันทึกข้อมูลสำเร็จ', 'success');
+}
+document.getElementById('saveBtn').addEventListener('click', saveChanges);
+document.getElementById('saveBtn2').addEventListener('click', saveChanges);
+
+// Export Excel
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const rows = members.map((m, i) => [
+    clubData.name, i+1, m.firstName, m.lastName, gradeLabel(m.grade)
+  ]);
+  exportToExcel(rows, ['ชื่อชุมนุม','ลำดับ','ชื่อ','นามสกุล','ระดับชั้น'], `${clubData.name}_รายชื่อนักเรียน.xlsx`);
+});
+
+['studentSearch','gradeFilter'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderMembers);
+  document.getElementById(id).addEventListener('change', renderMembers);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เลือกชุมนุม</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .toggle-btn { min-width:100px; transition: all 0.2s; }
+  .summary-bar {
+    position: sticky; bottom: 0;
+    background: var(--surface);
+    border-top: 2px solid var(--border);
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    z-index: 50;
+    box-shadow: 0 -4px 20px rgba(180,150,200,0.1);
+  }
+  .counter-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .counter-chip {
+    padding: 0.35rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    background: var(--pink-light);
+    color: var(--pink-dark);
+  }
+  .counter-chip.academic { background: var(--blue-light); color: #1565C0; }
+</style>
+</head>
+<body>
+<nav class="navbar">
+  <button class="hamburger-btn" id="hamburgerBtn"><span></span><span></span><span></span></button>
+  <a class="navbar-brand" href="index.html"><img src="https://www.pcccr.ac.th/assets/img/logo.svg" style="width:24px;height:24px;object-fit:contain;vertical-align:middle;margin-right:6px" alt=""> PCSHSCR CLUB</a>
+  <a href="student-dashboard.html" class="btn btn-ghost btn-sm">← กลับ</a>
+</nav>
+
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<div class="drawer" id="sideDrawer">
+  <div class="drawer-header">
+    <span class="drawer-title">🌸 เมนู</span>
+    <button class="drawer-close">✕</button>
+  </div>
+  <ul class="drawer-nav">
+    <li><a href="student-dashboard.html"><span class="icon">🏠</span>แดชบอร์ดนักเรียน</a></li>
+    <li><a href="index.html"><span class="icon">↩</span>กลับหน้าแรก</a></li>
+  </ul>
+</div>
+
+<div class="page-header">
+  <div>
+    <h2>🌟 เลือกชุมนุม</h2>
+    <p class="text-muted" id="roundName">กำลังโหลด...</p>
+  </div>
+</div>
+
+<div class="page-content">
+  <!-- Search & Filter -->
+  <div class="search-bar">
+    <div class="search-input-wrap">
+      <span>🔍</span>
+      <input type="text" id="searchInput" placeholder="ค้นหาชื่อชุมนุม หรือชื่อครู...">
+    </div>
+    <select class="filter-select" id="typeFilter">
+      <option value="">ทุกประเภท</option>
+      <option value="academic">วิชาการ</option>
+      <option value="general">ทั่วไป</option>
+    </select>
+    <select class="filter-select" id="seatsFilter">
+      <option value="">ทุกสถานะ</option>
+      <option value="available">มีที่ว่าง</option>
+    </select>
+  </div>
+
+  <!-- Status info -->
+  <div id="statusInfo" style="margin-bottom:1rem"></div>
+
+  <!-- Club Cards -->
+  <div class="clubs-grid" id="clubsGrid">
+    <div class="spinner"></div>
+  </div>
+  <div class="pagination" id="pagination"></div>
+</div>
+
+<!-- Sticky Summary Bar -->
+<div class="summary-bar">
+  <div>
+    <div style="font-weight:700; margin-bottom:0.25rem">ชุมนุมที่เลือก</div>
+    <div class="counter-chips" id="counterChips">
+      <span class="text-muted">ยังไม่ได้เลือก</span>
+    </div>
+  </div>
+  <button class="btn btn-success btn-lg" id="confirmBtn" disabled>
+    ✅ ยืนยันการลงทะเบียน (<span id="selectedCount">0</span>/<span id="requiredCount">0</span>)
+  </button>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+<script>
+const session = requireRole('student', 'student-login.html');
+if (!session) throw new Error('no session');
+const student = session.data;
+
+const params  = new URLSearchParams(location.search);
+const roundId = params.get('round');
+if (!roundId) { window.location.href = 'student-dashboard.html'; }
+
+let allClubs     = [];
+let selectedMap  = {}; // clubId → club data
+let requiredCount = 3;
+let previousClubNames = new Set(); // clubs student studied before (for duplicate check)
+let existingRegDocId  = null;
+
+initDrawer();
+
+// ── Load data ───────────────────────────────────────────────
+async function init() {
+  // Load round
+  const roundDoc = await db.collection(COL.ROUNDS).doc(roundId).get();
+  if (!roundDoc.exists || !roundDoc.data().isOpen) {
+    await showAlert({ title:'ปิดการลงทะเบียนแล้ว', body:'รอบนี้ปิดการลงทะเบียนแล้ว', icon:'🔴' });
+    window.location.href = 'student-dashboard.html';
+    return;
+  }
+  const round = roundDoc.data();
+  document.getElementById('roundName').textContent = round.name;
+  requiredCount = round.requiredClubs || 3;
+  document.getElementById('requiredCount').textContent = requiredCount;
+
+  // Load student's past registrations (for duplicate prevention)
+  const allRegSnap = await db.collection(COL.REGISTRATIONS)
+    .where('studentId', '==', student.studentId).get();
+  const grade = parseInt(student.grade);
+  const isJunior = grade <= 3;
+  allRegSnap.docs.forEach(d => {
+    const r = d.data();
+    if (r.roundId === roundId) { existingRegDocId = d.id; selectedMap = {}; }
+    // Track clubs from same school level (ม.ต้น or ม.ปลาย)
+    const rDoc = null; // we only need club names from completed registrations
+    if (r.clubs) r.clubs.forEach(c => previousClubNames.add(c.name));
+  });
+  // If editing current round, pre-populate selectedMap
+  if (existingRegDocId) {
+    const regDoc = await db.collection(COL.REGISTRATIONS).doc(existingRegDocId).get();
+    const existing = regDoc.data();
+    if (existing?.clubs) {
+      existing.clubs.forEach(c => { selectedMap[c.id] = c; });
+    }
+    // Remove current round clubs from duplicate check
+    existing?.clubs?.forEach(c => previousClubNames.delete(c.name));
+  }
+
+  // Load clubs for this round
+  const clubsSnap = await db.collection(COL.CLUBS)
+    .where('roundId', '==', roundId).get();
+  allClubs = clubsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  renderAll();
+}
+
+function renderAll() {
+  const search    = document.getElementById('searchInput').value.toLowerCase();
+  const typeF     = document.getElementById('typeFilter').value;
+  const seatsF    = document.getElementById('seatsFilter').value;
+
+  const filtered = allClubs.filter(c => {
+    const matchSearch = !search ||
+      c.name?.toLowerCase().includes(search) ||
+      c.teachers?.some(t => t.toLowerCase().includes(search));
+    const matchType  = !typeF  || c.type === typeF;
+    const matchSeats = !seatsF || (c.enrolled || 0) < c.maxCapacity;
+    return matchSearch && matchType && matchSeats;
+  });
+
+  const paginator = createPaginator(filtered, 24, (items, container) => {
+    if (items.length === 0) {
+      container.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🔍</div><p>ไม่พบชุมนุมที่ค้นหา</p></div>`;
+      return;
+    }
+    container.innerHTML = items.map(club => renderClubCard(club)).join('');
+    container.querySelectorAll('.toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => toggleClub(btn.dataset.clubId));
+    });
+  });
+
+  paginator.render(document.getElementById('clubsGrid'), document.getElementById('pagination'));
+  updateSummary();
+}
+
+function renderClubCard(club) {
+  const enrolled = club.enrolled || 0;
+  const max      = club.maxCapacity || 30;
+  const fillPct  = Math.min(100, Math.round(enrolled / max * 100));
+  const isFull   = enrolled >= max;
+  const isSelected = !!selectedMap[club.id];
+  const isDuplicate = previousClubNames.has(club.name);
+  const fillClass = fillPct >= 100 ? 'full' : fillPct >= 80 ? 'almost-full' : '';
+  const typeBadge = club.type === 'academic'
+    ? `<span class="badge badge-blue">วิชาการ</span>`
+    : `<span class="badge badge-orange">ทั่วไป</span>`;
+
+  let btnHtml;
+  if (isDuplicate) {
+    btnHtml = `<button class="btn btn-sm toggle-btn" disabled title="เคยเรียนชุมนุมนี้แล้ว" style="background:#e0e0e0;color:#888">เคยเรียนแล้ว</button>`;
+  } else if (isFull && !isSelected) {
+    btnHtml = `<button class="btn btn-sm toggle-btn" disabled style="background:#e0e0e0;color:#888">ที่นั่งเต็ม</button>`;
+  } else if (isSelected) {
+    btnHtml = `<button class="btn btn-success btn-sm toggle-btn" data-club-id="${club.id}">✓ เลือกแล้ว</button>`;
+  } else {
+    btnHtml = `<button class="btn btn-orange btn-sm toggle-btn" data-club-id="${club.id}">สมัคร</button>`;
+  }
+
+  return `
+    <div class="club-card${isSelected?' selected':''}${isFull&&!isSelected?' full':''}">
+      <div class="club-card-header">
+        <span class="club-code">${escHtml(club.code || '')}</span>
+        ${typeBadge}
+      </div>
+      <div class="club-name">${escHtml(club.name)}</div>
+      <div class="club-meta">
+        <span>📍 ${escHtml(club.room || '-')}</span>
+        <span>👨‍🏫 ${escHtml((club.teachers || []).join(', '))}</span>
+      </div>
+      <div class="seat-bar"><div class="seat-bar-fill ${fillClass}" style="width:${fillPct}%"></div></div>
+      <div class="seat-info">${enrolled}/${max} ที่นั่ง${isFull ? ' <strong style="color:#ff6b6b">เต็ม</strong>' : ''}</div>
+      <div class="mt-1" style="text-align:right">${btnHtml}</div>
+    </div>`;
+}
+
+async function toggleClub(clubId) {
+  const club = allClubs.find(c => c.id === clubId);
+  if (!club) return;
+
+  if (selectedMap[clubId]) {
+    // Deselect
+    delete selectedMap[clubId];
+  } else {
+    // Check duplicate
+    if (previousClubNames.has(club.name)) {
+      await showAlert({ title:'ไม่สามารถเลือกได้', body:'คุณเคยลงทะเบียนชุมนุมนี้แล้วในเทอมที่ผ่านมา', icon:'⚠️' });
+      return;
+    }
+    // Check seats (real-time)
+    const snap = await db.collection(COL.CLUBS).doc(clubId).get();
+    const latest = snap.data();
+    if ((latest.enrolled || 0) >= latest.maxCapacity) {
+      showToast('ขออภัย ที่นั่งในชุมนุมนี้เต็มแล้ว', 'error');
+      club.enrolled = latest.enrolled;
+      renderAll();
+      return;
+    }
+    selectedMap[clubId] = club;
+  }
+  renderAll();
+}
+
+function updateSummary() {
+  const selected = Object.values(selectedMap);
+  const count    = selected.length;
+  document.getElementById('selectedCount').textContent = count;
+  document.getElementById('confirmBtn').disabled = count < requiredCount;
+
+  const chips = document.getElementById('counterChips');
+  if (count === 0) {
+    chips.innerHTML = `<span class="text-muted">ยังไม่ได้เลือก</span>`;
+  } else {
+    chips.innerHTML = selected.map(c =>
+      `<span class="counter-chip${c.type==='academic'?' academic':''}">${escHtml(c.name)}</span>`
+    ).join('');
+  }
+}
+
+document.getElementById('confirmBtn').addEventListener('click', async () => {
+  const selected = Object.values(selectedMap);
+  if (selected.length < requiredCount) return;
+
+  const ok = await showConfirm({
+    title: 'ยืนยันการลงทะเบียน',
+    body: `คุณได้เลือกชุมนุม ${selected.length} ชุมนุม:<br>${selected.map(c=>`<strong>${escHtml(c.name)}</strong>`).join(', ')}<br><br>ยืนยันการลงทะเบียนใช่หรือไม่?`,
+    confirmText: 'ยืนยัน',
+    type: 'success'
+  });
+  if (!ok) return;
+
+  document.getElementById('confirmBtn').disabled = true;
+  document.getElementById('confirmBtn').textContent = 'กำลังบันทึก...';
+
+  try {
+    await db.runTransaction(async (tx) => {
+      // Verify seats are still available for all newly selected clubs
+      for (const club of selected) {
+        const clubRef = db.collection(COL.CLUBS).doc(club.id);
+        const clubDoc = await tx.get(clubRef);
+        if (!clubDoc.exists) throw new Error(`ไม่พบชุมนุม: ${club.name}`);
+        const data = clubDoc.data();
+        const wasSelected = existingRegDocId && (await db.collection(COL.REGISTRATIONS).doc(existingRegDocId).get()).data()?.clubs?.some(c => c.id === club.id);
+        if (!wasSelected && (data.enrolled || 0) >= data.maxCapacity) {
+          throw new Error(`ที่นั่งในชุมนุม "${club.name}" เต็มแล้วในขณะที่คุณทำรายการ`);
+        }
+      }
+
+      // Get old registration to decrement counts
+      if (existingRegDocId) {
+        const oldReg = await tx.get(db.collection(COL.REGISTRATIONS).doc(existingRegDocId));
+        const oldClubs = oldReg.data()?.clubs || [];
+        for (const old of oldClubs) {
+          if (!selected.find(c => c.id === old.id)) {
+            tx.update(db.collection(COL.CLUBS).doc(old.id), {
+              enrolled: firebase.firestore.FieldValue.increment(-1)
+            });
+          }
+        }
+      }
+
+      // Increment enrolled counts for newly added clubs
+      const existingIds = existingRegDocId
+        ? ((await db.collection(COL.REGISTRATIONS).doc(existingRegDocId).get()).data()?.clubs || []).map(c=>c.id)
+        : [];
+      for (const club of selected) {
+        if (!existingIds.includes(club.id)) {
+          tx.update(db.collection(COL.CLUBS).doc(club.id), {
+            enrolled: firebase.firestore.FieldValue.increment(1)
+          });
+        }
+      }
+
+      // Save registration
+      const regData = {
+        studentId:  student.studentId,
+        studentName:`${student.firstName} ${student.lastName}`,
+        grade:      student.grade,
+        roundId,
+        clubs: selected.map(c => ({ id: c.id, name: c.name, code: c.code || '', type: c.type })),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      if (existingRegDocId) {
+        tx.update(db.collection(COL.REGISTRATIONS).doc(existingRegDocId), regData);
+      } else {
+        regData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        tx.set(db.collection(COL.REGISTRATIONS).doc(), regData);
+      }
+    });
+
+    await writeAuditLog('register_clubs', COL.REGISTRATIONS, student.studentId, { clubs: selected.map(c=>c.name) });
+    await showAlert({ title:'ลงทะเบียนสำเร็จ!', body:'ชุมนุมของคุณถูกบันทึกเรียบร้อยแล้ว', icon:'✅' });
+    window.location.href = 'student-dashboard.html';
+
+  } catch (err) {
+    await showAlert({ title:'เกิดข้อผิดพลาด', body: err.message, icon:'❌' });
+    document.getElementById('confirmBtn').disabled = false;
+    document.getElementById('confirmBtn').innerHTML = `✅ ยืนยันการลงทะเบียน (<span id="selectedCount">${Object.keys(selectedMap).length}</span>/<span id="requiredCount">${requiredCount}</span>)`;
+  }
+});
+
+// Filters
+['searchInput','typeFilter','seatsFilter'].forEach(id => {
+  document.getElementById(id)?.addEventListener('input', renderAll);
+  document.getElementById(id)?.addEventListener('change', renderAll);
+});
+
+init();
+</script>
+</body>
+</html>

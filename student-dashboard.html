@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>แดชบอร์ดนักเรียน</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="navbar">
+  <button class="hamburger-btn" id="hamburgerBtn"><span></span><span></span><span></span></button>
+  <a class="navbar-brand" href="index.html"><img src="https://www.pcccr.ac.th/assets/img/logo.svg" style="width:24px;height:24px;object-fit:contain;vertical-align:middle;margin-right:6px" alt=""> PCSHSCR CLUB</a>
+  <button class="btn btn-ghost btn-sm" id="logoutBtn">ออกจากระบบ</button>
+</nav>
+
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<div class="drawer" id="sideDrawer">
+  <div class="drawer-header">
+    <span class="drawer-title">🌸 เมนู</span>
+    <button class="drawer-close">✕</button>
+  </div>
+  <ul class="drawer-nav">
+    <li><a href="student-dashboard.html"><span class="icon">🏠</span>หน้าหลักนักเรียน</a></li>
+    <li><a href="index.html"><span class="icon">↩</span>กลับหน้าแรก</a></li>
+  </ul>
+</div>
+
+<div class="page-header">
+  <div>
+    <h2>📋 รอบการลงทะเบียนชุมนุม</h2>
+    <p class="text-muted" id="welcomeMsg"></p>
+  </div>
+</div>
+
+<div class="page-content">
+  <!-- Status Banner -->
+  <div id="statusBanner"></div>
+
+  <!-- Registration Rounds Table -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ชื่อรอบ</th>
+          <th>ตัวเลือกของคุณ</th>
+          <th>การดำเนินการ</th>
+        </tr>
+      </thead>
+      <tbody id="roundsBody">
+        <tr><td colspan="3" class="text-center"><div class="spinner"></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+<script>
+const session = requireRole('student', 'student-login.html');
+if (!session) throw new Error('no session');
+
+const student = session.data;
+document.getElementById('welcomeMsg').textContent =
+  `ยินดีต้อนรับ ${student.firstName} ${student.lastName} (${student.studentId})`;
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  if (await showConfirm({ title:'ออกจากระบบ', body:'คุณต้องการออกจากระบบใช่หรือไม่?', type:'warning' })) {
+    clearSession();
+    window.location.href = 'student-login.html';
+  }
+});
+
+initDrawer();
+
+async function loadRounds() {
+  // Refresh round statuses based on scheduled times
+  const roundsSnap = await db.collection(COL.ROUNDS).orderBy('createdAt', 'desc').get();
+  const rounds = roundsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  // Check & update open/close based on scheduled times
+  const now = Date.now();
+  for (const round of rounds) {
+    const shouldBeOpen =
+      round.openAt?.toMillis() <= now &&
+      round.closeAt?.toMillis() >= now &&
+      round.studentRegOpen === true;
+    if (round.isOpen !== shouldBeOpen) {
+      await db.collection(COL.ROUNDS).doc(round.id).update({ isOpen: shouldBeOpen });
+      round.isOpen = shouldBeOpen;
+    }
+  }
+
+  // Get current student's registrations
+  const regSnap = await db.collection(COL.REGISTRATIONS)
+    .where('studentId', '==', student.studentId)
+    .get();
+  const regMap = {};
+  regSnap.docs.forEach(d => {
+    const data = d.data();
+    regMap[data.roundId] = data;
+  });
+
+  // Render status banner for the current open round
+  const openRound = rounds.find(r => r.isOpen);
+  const bannerEl  = document.getElementById('statusBanner');
+  if (openRound) {
+    bannerEl.innerHTML = `
+      <div class="status-banner open">
+        🟢 <span>สถานะ: <strong>เปิดการลงทะเบียน</strong> — ปิดระบบ: ${formatDate(openRound.closeAt)}</span>
+      </div>`;
+  } else {
+    const nextRound = rounds.find(r => r.openAt?.toMillis() > now);
+    bannerEl.innerHTML = `
+      <div class="status-banner closed">
+        🔴 <span>สถานะ: <strong>ปิดการลงทะเบียน</strong>${nextRound ? ` — เปิดครั้งถัดไป: ${formatDate(nextRound.openAt)}` : ''}</span>
+      </div>`;
+  }
+
+  // Render table
+  const tbody = document.getElementById('roundsBody');
+  if (rounds.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3"><div class="empty-state"><div class="empty-icon">📭</div><p>ยังไม่มีรอบการลงทะเบียน</p></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rounds.map(round => {
+    const reg = regMap[round.id];
+    let choiceBadge = '';
+    if (reg) {
+      const clubNames = reg.clubs?.map(c => `<span class="badge badge-green">${escHtml(c.name)}</span>`).join(' ') || '';
+      choiceBadge = `<div class="flex flex-wrap gap-1" style="margin-top:4px">${clubNames}</div>`;
+    } else {
+      choiceBadge = `<span class="badge badge-red">ยังไม่ได้เลือกชุมนุม</span>`;
+    }
+
+    let actionBtn = '';
+    if (round.isOpen) {
+      actionBtn = `<a href="club-selection.html?round=${round.id}" class="btn btn-primary btn-sm">${reg ? '✏️ แก้ไขชุมนุม' : '➕ สมัคร'}</a>`;
+    }
+
+    return `
+      <tr>
+        <td>
+          <div style="font-weight:600">${escHtml(round.name)}</div>
+          <div class="text-muted" style="font-size:0.8rem">${escHtml(round.description || '')}</div>
+        </td>
+        <td>${choiceBadge}</td>
+        <td>${actionBtn}</td>
+      </tr>`;
+  }).join('');
+}
+
+loadRounds();
+</script>
+</body>
+</html>

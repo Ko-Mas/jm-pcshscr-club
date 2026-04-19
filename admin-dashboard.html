@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin Dashboard – PCSHSCR Club</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .admin-layout { display: flex; min-height: calc(100vh - 60px); }
+  .admin-sidebar {
+    width: 230px; flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 1rem;
+    position: sticky; top: 60px;
+    height: calc(100vh - 60px);
+    overflow-y: auto;
+  }
+  .admin-main { flex: 1; padding: 1.5rem; overflow-x: hidden; }
+  .sidebar-nav { list-style: none; }
+  .sidebar-nav li { margin-bottom: 0.25rem; }
+  .sidebar-nav a {
+    display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.6rem 0.85rem; border-radius: var(--radius-sm);
+    text-decoration: none; color: var(--text); font-size: 0.9rem;
+    transition: all var(--transition);
+  }
+  .sidebar-nav a:hover { background: var(--mint-light); color: #2E7D66; }
+  .sidebar-nav a.active { background: var(--mint-light); color: #2E7D66; font-weight: 700; }
+  .sidebar-section { font-size: 0.75rem; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.08em; padding: 0.75rem 0.85rem 0.25rem; }
+  @media(max-width:640px) { .admin-sidebar { display: none; } }
+  .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .stat-card { background: var(--surface); border-radius: var(--radius); padding: 1.25rem; text-align: center; border: 1px solid var(--border); }
+  .stat-card .num { font-size: 2rem; font-weight: 800; }
+  .stat-card .lbl { font-size: 0.82rem; color: var(--text-light); margin-top: 0.25rem; }
+</style>
+</head>
+<body>
+<nav class="navbar">
+  <a class="navbar-brand" href="index.html"><img src="https://www.pcccr.ac.th/assets/img/logo.svg" style="width:24px;height:24px;object-fit:contain;vertical-align:middle;margin-right:6px" alt=""> PCSHSCR CLUB – Admin</a>
+  <button class="btn btn-ghost btn-sm" id="logoutBtn">ออกจากระบบ</button>
+</nav>
+
+<div class="admin-layout">
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-section">จัดการระบบ</div>
+    <ul class="sidebar-nav">
+      <li><a href="#" class="active" data-tab="overview">📊 ภาพรวม</a></li>
+      <li><a href="#" data-tab="rounds">📅 รอบการลงทะเบียน</a></li>
+      <li><a href="#" data-tab="clubs">🌟 จัดการชุมนุม</a></li>
+      <li><a href="#" data-tab="students">🎒 ข้อมูลนักเรียน</a></li>
+      <li><a href="#" data-tab="tracking">📈 ติดตามการลงทะเบียน</a></li>
+      <li><a href="#" data-tab="reports">📥 ออกรายงาน</a></li>
+      <li><a href="#" data-tab="security">🔒 รหัสผ่าน/ความปลอดภัย</a></li>
+      <li><a href="#" data-tab="auditlog">📝 Audit Log</a></li>
+    </ul>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="admin-main">
+
+    <!-- ═══ OVERVIEW ═══════════════════════════════════════════ -->
+    <div id="tab-overview" class="tab-content">
+      <h2 style="margin-bottom:1.25rem;color:var(--mint-dark)">📊 ภาพรวมระบบ</h2>
+      <div class="stat-cards" id="statCards">
+        <div class="stat-card"><div class="spinner"></div></div>
+      </div>
+      <div class="card">
+        <div class="section-title">🔄 กิจกรรมล่าสุด</div>
+        <div id="recentActivity"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- ═══ ROUNDS ══════════════════════════════════════════════ -->
+    <div id="tab-rounds" class="tab-content" style="display:none">
+      <div class="flex justify-between align-center mb-3" style="flex-wrap:wrap;gap:1rem">
+        <h2 style="color:var(--mint-dark)">📅 รอบการลงทะเบียน</h2>
+        <button class="btn btn-primary" id="addRoundBtn">+ เพิ่มรอบ</button>
+      </div>
+      <div id="roundsList"><div class="spinner"></div></div>
+    </div>
+
+    <!-- ═══ CLUBS ════════════════════════════════════════════════ -->
+    <div id="tab-clubs" class="tab-content" style="display:none">
+      <div class="flex justify-between align-center mb-3" style="flex-wrap:wrap;gap:1rem">
+        <h2 style="color:var(--mint-dark)">🌟 จัดการชุมนุม</h2>
+        <div class="flex gap-1 flex-wrap">
+          <button class="btn btn-ghost btn-sm" id="downloadClubTemplate">⬇ Template Excel</button>
+          <label class="btn btn-secondary btn-sm" style="cursor:pointer">
+            ⬆ อัปโหลด Excel <input type="file" id="uploadClubs" accept=".xlsx,.xls" style="display:none">
+          </label>
+        </div>
+      </div>
+      <div class="search-bar mb-2">
+        <div class="search-input-wrap"><span>🔍</span><input type="text" id="clubSearch" placeholder="ค้นหาชุมนุม..."></div>
+        <select class="filter-select" id="clubRoundFilter"><option value="">ทุกรอบ</option></select>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>ชื่อชุมนุม</th><th>ประเภท</th><th>ครูที่ปรึกษา</th><th>ห้อง</th><th>ที่นั่ง</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+        <tbody id="clubsBody"><tr><td colspan="7" class="text-center"><div class="spinner"></div></td></tr></tbody>
+      </table></div>
+      <div class="pagination" id="clubPagination"></div>
+    </div>
+
+    <!-- ═══ STUDENTS ═════════════════════════════════════════════ -->
+    <div id="tab-students" class="tab-content" style="display:none">
+      <div class="flex justify-between align-center mb-3" style="flex-wrap:wrap;gap:1rem">
+        <h2 style="color:var(--mint-dark)">🎒 ข้อมูลนักเรียน</h2>
+        <div class="flex gap-1 flex-wrap">
+          <button class="btn btn-ghost btn-sm" id="downloadStudentTemplate">⬇ Template Excel</button>
+          <label class="btn btn-secondary btn-sm" style="cursor:pointer">
+            ⬆ อัปโหลด Excel <input type="file" id="uploadStudents" accept=".xlsx,.xls" style="display:none">
+          </label>
+          <button class="btn btn-primary btn-sm" id="addStudentBtn">+ เพิ่มรายคน</button>
+        </div>
+      </div>
+
+      <div class="tabs" id="gradeTabs">
+        <button class="tab-btn active" data-grade="all">ทั้งหมด</button>
+        <button class="tab-btn" data-grade="1">ม.1</button>
+        <button class="tab-btn" data-grade="2">ม.2</button>
+        <button class="tab-btn" data-grade="3">ม.3</button>
+        <button class="tab-btn" data-grade="4">ม.4</button>
+        <button class="tab-btn" data-grade="5">ม.5</button>
+        <button class="tab-btn" data-grade="6">ม.6</button>
+      </div>
+
+      <div class="search-bar mb-2">
+        <div class="search-input-wrap"><span>🔍</span><input type="text" id="studentSearch" placeholder="ค้นหานักเรียน..."></div>
+        <button class="btn btn-danger btn-sm" id="deleteGradeBtn">🗑 ลบทั้งระดับชั้น</button>
+      </div>
+
+      <div class="table-wrap"><table>
+        <thead><tr><th>#</th><th>รหัสนักเรียน</th><th>ชื่อ</th><th>นามสกุล</th><th>ระดับชั้น</th><th>ชุมนุมปัจจุบัน</th><th>จัดการ</th></tr></thead>
+        <tbody id="studentsBody"><tr><td colspan="7" class="text-center"><div class="spinner"></div></td></tr></tbody>
+      </table></div>
+      <div class="pagination" id="studentPagination"></div>
+    </div>
+
+    <!-- ═══ TRACKING ══════════════════════════════════════════════ -->
+    <div id="tab-tracking" class="tab-content" style="display:none">
+      <h2 style="margin-bottom:1.25rem;color:var(--mint-dark)">📈 ติดตามการลงทะเบียน</h2>
+      <div class="tabs">
+        <button class="tab-btn active" onclick="showTrackingTab('notReg')">ยังไม่ลงทะเบียน</button>
+        <button class="tab-btn" onclick="showTrackingTab('reg')">ลงทะเบียนแล้ว</button>
+        <button class="tab-btn" onclick="showTrackingTab('teachers')">สถานะครู</button>
+      </div>
+      <div id="trackingContent"><div class="spinner"></div></div>
+    </div>
+
+    <!-- ═══ REPORTS ═══════════════════════════════════════════════ -->
+    <div id="tab-reports" class="tab-content" style="display:none">
+      <h2 style="margin-bottom:1.25rem;color:var(--mint-dark)">📥 ออกรายงาน</h2>
+      <div class="card mb-2">
+        <div class="section-title">📊 ดาวน์โหลดรายงานการลงทะเบียน</div>
+        <div class="flex gap-2 flex-wrap mt-2">
+          <button class="btn btn-primary" id="exportAllBtn">📥 ดาวน์โหลดทั้งโรงเรียน</button>
+          <button class="btn btn-secondary" id="exportByGradeBtn">📥 แยกตามระดับชั้น</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SECURITY ══════════════════════════════════════════════ -->
+    <div id="tab-security" class="tab-content" style="display:none">
+      <h2 style="margin-bottom:1.25rem;color:var(--mint-dark)">🔒 จัดการรหัสผ่าน</h2>
+      <div class="card" style="max-width:480px">
+        <div class="form-group">
+          <label class="form-label">รหัสผ่านแอดมิน (ใหม่)</label>
+          <input type="password" class="form-control" id="newAdminPass" placeholder="ใส่รหัสผ่านใหม่">
+        </div>
+        <div class="form-group">
+          <label class="form-label">รหัสผ่านครู (ใหม่)</label>
+          <input type="password" class="form-control" id="newTeacherPin" placeholder="ใส่รหัส PIN ครูใหม่">
+        </div>
+        <button class="btn btn-primary" id="savePassBtn">💾 บันทึกรหัสผ่าน</button>
+      </div>
+    </div>
+
+    <!-- ═══ AUDIT LOG ══════════════════════════════════════════════ -->
+    <div id="tab-auditlog" class="tab-content" style="display:none">
+      <h2 style="margin-bottom:1.25rem;color:var(--mint-dark)">📝 ประวัติการทำรายการ (Audit Log)</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>เวลา</th><th>ผู้ทำรายการ</th><th>การกระทำ</th><th>เป้าหมาย</th><th>รายละเอียด</th></tr></thead>
+        <tbody id="auditBody"><tr><td colspan="5" class="text-center"><div class="spinner"></div></td></tr></tbody>
+      </table></div>
+      <div class="pagination" id="auditPagination"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Add Round Modal -->
+<div class="modal-overlay" id="roundModal">
+  <div class="modal" style="max-width:520px;text-align:left">
+    <h3 style="margin-bottom:1.25rem;color:var(--mint-dark)">📅 <span id="roundModalTitle">เพิ่มรอบการลงทะเบียน</span></h3>
+    <input type="hidden" id="editRoundId">
+    <div class="form-group">
+      <label class="form-label">ชื่อรอบ <span style="color:red">*</span></label>
+      <input type="text" class="form-control" id="roundName" placeholder="เช่น ชุมนุม ภาคเรียนที่ 1 ปีการศึกษา 2569">
+    </div>
+    <div class="form-group">
+      <label class="form-label">คำอธิบาย</label>
+      <input type="text" class="form-control" id="roundDesc" placeholder="คำอธิบายเพิ่มเติม">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div class="form-group">
+        <label class="form-label">เปิดรับสมัครนักเรียน เวลา</label>
+        <input type="datetime-local" class="form-control" id="roundOpen">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ปิดรับสมัคร เวลา</label>
+        <input type="datetime-local" class="form-control" id="roundClose">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">จำนวนชุมนุมที่นักเรียนต้องเลือก</label>
+      <input type="number" class="form-control" id="roundRequired" value="3" min="1" style="max-width:150px">
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer">
+        <input type="checkbox" id="teacherEditOpen" checked> เปิดให้ครูเข้ามาเพิ่ม/แก้ไขชุมนุมในรอบนี้
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="document.getElementById('roundModal').classList.remove('open')">ยกเลิก</button>
+      <button class="btn btn-primary" id="saveRoundBtn">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Student Modal -->
+<div class="modal-overlay" id="studentModal">
+  <div class="modal" style="max-width:480px;text-align:left">
+    <h3 style="margin-bottom:1.25rem;color:var(--mint-dark)" id="studentModalTitle">เพิ่มนักเรียน</h3>
+    <input type="hidden" id="editStudentId">
+    <div class="form-group"><label class="form-label">รหัสนักเรียน <span style="color:red">*</span></label><input type="text" class="form-control" id="sStudentId"></div>
+    <div class="form-group"><label class="form-label">เลขบัตรประชาชน <span style="color:red">*</span></label><input type="text" class="form-control" id="sNationalId" maxlength="13"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div class="form-group"><label class="form-label">ชื่อ <span style="color:red">*</span></label><input type="text" class="form-control" id="sFirstName"></div>
+      <div class="form-group"><label class="form-label">นามสกุล <span style="color:red">*</span></label><input type="text" class="form-control" id="sLastName"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">ระดับชั้น <span style="color:red">*</span></label>
+      <select class="form-control" id="sGrade">
+        <option value="1">ม.1</option><option value="2">ม.2</option><option value="3">ม.3</option>
+        <option value="4">ม.4</option><option value="5">ม.5</option><option value="6">ม.6</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="document.getElementById('studentModal').classList.remove('open')">ยกเลิก</button>
+      <button class="btn btn-primary" id="saveStudentBtn">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Club Modal -->
+<div class="modal-overlay" id="clubEditModal">
+  <div class="modal" style="max-width:480px;text-align:left">
+    <h3 style="margin-bottom:1.25rem;color:var(--mint-dark)">✏️ แก้ไขข้อมูลชุมนุม</h3>
+    <input type="hidden" id="editClubDocId">
+    <div class="form-group">
+      <label class="form-label">ชื่อชุมนุม</label>
+      <input type="text" class="form-control" id="editClubNameDisplay" disabled style="background:var(--bg);opacity:0.7">
+    </div>
+    <div class="form-group">
+      <label class="form-label">สถานที่/ห้องเรียน</label>
+      <select class="form-control" id="editClubRoom">
+        <option value="">-- กรุณาเลือกห้องเรียน --</option>
+        <option value="ฟิสิกส์ 1">ฟิสิกส์ 1</option>
+        <option value="ฟิสิกส์ 2">ฟิสิกส์ 2</option>
+        <option value="เคมี 1">เคมี 1</option>
+        <option value="เคมี 2">เคมี 2</option>
+        <option value="ชีวะ 1">ชีวะ 1</option>
+        <option value="ชีวะ 2">ชีวะ 2</option>
+        <option value="ห้องคอม 1">ห้องคอม 1</option>
+        <option value="ห้องคอม 2">ห้องคอม 2</option>
+        <option value="ห้องเรียนรวม">ห้องเรียนรวม</option>
+        <option value="smart 1">smart 1</option>
+        <option value="smart 2">smart 2</option>
+        <option value="smart 3">smart 3</option>
+        <option value="จภ. 1">จภ. 1</option>
+        <option value="จภ. 2">จภ. 2</option>
+        <option value="จภ. 3">จภ. 3</option>
+        <option value="จภ. 4">จภ. 4</option>
+        <option value="FABLAB">FABLAB</option>
+        <option value="other">อื่นๆ (โปรดระบุ)</option>
+      </select>
+      <input type="text" class="form-control mt-1" id="editClubRoomOther" placeholder="โปรดระบุสถานที่/ห้องเรียน" style="display:none">
+    </div>
+    <div class="form-group">
+      <label class="form-label">จำนวนที่นั่ง</label>
+      <input type="number" class="form-control" id="editClubMaxCap" min="1" style="max-width:150px">
+    </div>
+    <div class="form-group">
+      <label class="form-label">สถานะ</label>
+      <select class="form-control" id="editClubStatus" style="max-width:200px">
+        <option value="approved">อนุมัติ</option>
+        <option value="pending">รออนุมัติ</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="document.getElementById('clubEditModal').classList.remove('open')">ยกเลิก</button>
+      <button class="btn btn-primary" id="saveClubEditBtn">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<!-- SheetJS -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+<script>
+requireRole('admin', 'admin-login.html');
+
+// ── Tab Navigation ────────────────────────────────────────────
+let currentTab = 'overview';
+document.querySelectorAll('[data-tab]').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    switchTab(link.dataset.tab);
+    document.querySelectorAll('[data-tab]').forEach(l => l.classList.remove('active'));
+    link.classList.add('active');
+  });
+});
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+  document.getElementById(`tab-${tab}`).style.display = '';
+  currentTab = tab;
+  tabLoaders[tab]?.();
+}
+
+// ── Tab Loaders ───────────────────────────────────────────────
+const tabLoaders = {
+  overview:  loadOverview,
+  rounds:    loadRounds,
+  clubs:     loadClubs,
+  students:  loadStudents,
+  tracking:  loadTracking,
+  reports:   () => {},
+  security:  () => {},
+  auditlog:  loadAuditLog
+};
+
+// ── Logout ────────────────────────────────────────────────────
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  if (await showConfirm({ title:'ออกจากระบบ', body:'ยืนยันการออกจากระบบ?', type:'warning' })) {
+    clearSession(); window.location.href = 'admin-login.html';
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  OVERVIEW
+// ══════════════════════════════════════════════════════════════
+async function loadOverview() {
+  const [studentsSnap, clubsSnap, regSnap] = await Promise.all([
+    db.collection(COL.STUDENTS).get(),
+    db.collection(COL.CLUBS).get(),
+    db.collection(COL.REGISTRATIONS).get()
+  ]);
+  const registeredIds = new Set(regSnap.docs.map(d => d.data().studentId));
+  document.getElementById('statCards').innerHTML = `
+    <div class="stat-card"><div class="num" style="color:var(--pink-dark)">${studentsSnap.size}</div><div class="lbl">นักเรียนทั้งหมด</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--blue-dark)">${clubsSnap.size}</div><div class="lbl">ชุมนุมทั้งหมด</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--mint-dark)">${registeredIds.size}</div><div class="lbl">ลงทะเบียนแล้ว</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--orange-dark)">${studentsSnap.size - registeredIds.size}</div><div class="lbl">ยังไม่ได้ลงทะเบียน</div></div>`;
+
+  const auditSnap = await db.collection(COL.AUDIT_LOG).orderBy('timestamp','desc').limit(8).get();
+  document.getElementById('recentActivity').innerHTML = auditSnap.empty
+    ? '<p class="text-muted">ยังไม่มีกิจกรรม</p>'
+    : `<div style="display:flex;flex-direction:column;gap:0.5rem">${auditSnap.docs.map(d=>{
+        const r=d.data();
+        return `<div style="display:flex;gap:1rem;font-size:0.88rem;padding:0.5rem;background:var(--bg);border-radius:6px">
+          <span class="text-muted" style="white-space:nowrap">${formatDate(r.timestamp)}</span>
+          <span><strong>${escHtml(r.actor)}</strong> ${escHtml(r.action)} / ${escHtml(r.targetCollection)}</span>
+        </div>`;}).join('')}</div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ROUNDS
+// ══════════════════════════════════════════════════════════════
+async function loadRounds() {
+  const snap = await db.collection(COL.ROUNDS).orderBy('createdAt','desc').get();
+  if (snap.empty) {
+    document.getElementById('roundsList').innerHTML = '<div class="empty-state"><div class="empty-icon">📅</div><p>ยังไม่มีรอบการลงทะเบียน กดปุ่ม "+ เพิ่มรอบ" เพื่อสร้าง</p></div>';
+    return;
+  }
+  const now = Date.now();
+  document.getElementById('roundsList').innerHTML = snap.docs.map(doc => {
+    const r = doc.data();
+    const isOpen = r.openAt?.toMillis() <= now && r.closeAt?.toMillis() >= now;
+    return `
+      <div class="card mb-2">
+        <div class="flex justify-between align-center flex-wrap gap-1">
+          <div>
+            <div style="font-weight:700;font-size:1rem">${escHtml(r.name)}</div>
+            <div class="text-muted" style="font-size:0.82rem">
+              เปิด: ${formatDate(r.openAt)} → ปิด: ${formatDate(r.closeAt)}
+              | ต้องเลือก ${r.requiredClubs || 3} ชุมนุม
+            </div>
+          </div>
+          <div class="flex gap-1 flex-wrap align-center">
+            <span class="badge ${isOpen?'badge-green':'badge-red'}">${isOpen?'เปิดอยู่':'ปิดแล้ว'}</span>
+            <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer">
+              <input type="checkbox" ${r.teacherEditOpen?'checked':''} onchange="toggleTeacherEdit('${doc.id}',this.checked)"> ครูแก้ไขได้
+            </label>
+            <button class="btn btn-ghost btn-sm" onclick="editRound('${doc.id}')">✏️ แก้ไข</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteRound('${doc.id}','${escHtml(r.name)}')">🗑 ลบ</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+document.getElementById('addRoundBtn').addEventListener('click', () => {
+  document.getElementById('editRoundId').value = '';
+  document.getElementById('roundModalTitle').textContent = 'เพิ่มรอบการลงทะเบียน';
+  ['roundName','roundDesc','roundOpen','roundClose'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('roundRequired').value = 3;
+  document.getElementById('teacherEditOpen').checked = true;
+  document.getElementById('roundModal').classList.add('open');
+});
+
+function editRound(id) {
+  db.collection(COL.ROUNDS).doc(id).get().then(doc => {
+    const r = doc.data();
+    document.getElementById('editRoundId').value = id;
+    document.getElementById('roundModalTitle').textContent = 'แก้ไขรอบการลงทะเบียน';
+    document.getElementById('roundName').value = r.name || '';
+    document.getElementById('roundDesc').value = r.description || '';
+    document.getElementById('roundOpen').value = r.openAt?.toDate().toISOString().slice(0,16) || '';
+    document.getElementById('roundClose').value = r.closeAt?.toDate().toISOString().slice(0,16) || '';
+    document.getElementById('roundRequired').value = r.requiredClubs || 3;
+    document.getElementById('teacherEditOpen').checked = r.teacherEditOpen !== false;
+    document.getElementById('roundModal').classList.add('open');
+  });
+}
+
+document.getElementById('saveRoundBtn').addEventListener('click', async () => {
+  const name = document.getElementById('roundName').value.trim();
+  const openVal  = document.getElementById('roundOpen').value;
+  const closeVal = document.getElementById('roundClose').value;
+  if (!name || !openVal || !closeVal) { showToast('กรุณากรอกข้อมูลให้ครบ','error'); return; }
+
+  const data = {
+    name,
+    description:    document.getElementById('roundDesc').value.trim(),
+    openAt:         firebase.firestore.Timestamp.fromDate(new Date(openVal)),
+    closeAt:        firebase.firestore.Timestamp.fromDate(new Date(closeVal)),
+    requiredClubs:  parseInt(document.getElementById('roundRequired').value) || 3,
+    teacherEditOpen: document.getElementById('teacherEditOpen').checked,
+    isOpen: false
+  };
+
+  const id = document.getElementById('editRoundId').value;
+  if (id) {
+    await db.collection(COL.ROUNDS).doc(id).update(data);
+    await writeAuditLog('update_round', COL.ROUNDS, id, { name });
+  } else {
+    data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    const ref = await db.collection(COL.ROUNDS).add(data);
+    await writeAuditLog('create_round', COL.ROUNDS, ref.id, { name });
+  }
+  document.getElementById('roundModal').classList.remove('open');
+  showToast('บันทึกรอบสำเร็จ','success');
+  loadRounds();
+});
+
+async function toggleTeacherEdit(id, val) {
+  await db.collection(COL.ROUNDS).doc(id).update({ teacherEditOpen: val });
+  showToast(`${val?'เปิด':'ปิด'}การแก้ไขสำหรับครูแล้ว`,'success');
+}
+
+async function deleteRound(id, name) {
+  if (await showConfirm({ title:'ลบรอบ', body:`ลบรอบ "<strong>${name}</strong>" ใช่หรือไม่?`, type:'danger', confirmText:'ลบ' })) {
+    await db.collection(COL.ROUNDS).doc(id).delete();
+    await writeAuditLog('delete_round', COL.ROUNDS, id, { name });
+    showToast('ลบรอบสำเร็จ','success');
+    loadRounds();
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CLUBS
+// ══════════════════════════════════════════════════════════════
+let allClubs = [];
+
+async function loadClubs() {
+  // Populate round filter
+  const roundsSnap = await db.collection(COL.ROUNDS).orderBy('createdAt','desc').get();
+  const roundFilter = document.getElementById('clubRoundFilter');
+  roundFilter.innerHTML = '<option value="">ทุกรอบ</option>';
+  roundsSnap.docs.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id; opt.textContent = d.data().name;
+    roundFilter.appendChild(opt);
+  });
+
+  const snap = await db.collection(COL.CLUBS).orderBy('name').get();
+  allClubs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderClubsTable();
+}
+
+function renderClubsTable() {
+  const q     = document.getElementById('clubSearch').value.toLowerCase();
+  const round = document.getElementById('clubRoundFilter').value;
+  const filtered = allClubs.filter(c =>
+    (!q || c.name?.toLowerCase().includes(q) || (c.teachers||[]).join('').toLowerCase().includes(q)) &&
+    (!round || c.roundId === round)
+  );
+  const paginator = createPaginator(filtered, 25, (items, tbody) => {
+    if (!items.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">ไม่พบชุมนุม</td></tr>'; return; }
+    tbody.innerHTML = items.map(c => `
+      <tr>
+        <td><strong>${escHtml(c.name)}</strong></td>
+        <td>${c.type==='academic'?'<span class="badge badge-blue">วิชาการ</span>':'<span class="badge badge-orange">ทั่วไป</span>'}</td>
+        <td style="font-size:0.85rem">${escHtml((c.teachers||[]).join(', '))}</td>
+        <td>${escHtml(c.room||'-')}</td>
+        <td><span class="${(c.enrolled||0)>=(c.maxCapacity||30)?'badge badge-red':'badge badge-green'}">${c.enrolled||0}/${c.maxCapacity||30}</span></td>
+        <td>${c.status==='pending'?'<span class="badge badge-orange">รออนุมัติ</span>':'<span class="badge badge-green">อนุมัติ</span>'}</td>
+        <td>
+          <button class="btn btn-ghost btn-sm" onclick="editClub('${c.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteClub('${c.id}','${escHtml(c.name)}')">🗑</button>
+        </td>
+      </tr>`).join('');
+  });
+  paginator.render(document.getElementById('clubsBody'), document.getElementById('clubPagination'));
+}
+
+['clubSearch','clubRoundFilter'].forEach(id => {
+  document.getElementById(id)?.addEventListener('input', renderClubsTable);
+  document.getElementById(id)?.addEventListener('change', renderClubsTable);
+});
+
+async function deleteClub(id, name) {
+  if (await showConfirm({ title:'ลบชุมนุม', body:`ลบชุมนุม "<strong>${name}</strong>" ใช่หรือไม่? ข้อมูลการลงทะเบียนจะยังคงอยู่`, type:'danger', confirmText:'ลบ' })) {
+    await db.collection(COL.CLUBS).doc(id).delete();
+    await writeAuditLog('delete_club', COL.CLUBS, id, { name });
+    showToast('ลบชุมนุมสำเร็จ','success');
+    loadClubs();
+  }
+}
+
+function editClub(id) {
+  const c = allClubs.find(x => x.id === id);
+  if (!c) return;
+
+  document.getElementById('editClubDocId').value = id;
+  document.getElementById('editClubNameDisplay').value = c.name;
+  document.getElementById('editClubMaxCap').value = c.maxCapacity || 30;
+  document.getElementById('editClubStatus').value = c.status || 'pending';
+
+  const roomSel   = document.getElementById('editClubRoom');
+  const roomOther = document.getElementById('editClubRoomOther');
+  const knownRooms = [...roomSel.options].map(o => o.value).filter(v => v && v !== 'other');
+  if (c.room && knownRooms.includes(c.room)) {
+    roomSel.value = c.room;
+    roomOther.style.display = 'none';
+  } else if (c.room) {
+    roomSel.value = 'other';
+    roomOther.style.display = '';
+    roomOther.value = c.room;
+  } else {
+    roomSel.value = '';
+    roomOther.style.display = 'none';
+  }
+
+  document.getElementById('clubEditModal').classList.add('open');
+}
+
+document.getElementById('editClubRoom').addEventListener('change', function() {
+  const isOther = this.value === 'other';
+  const other = document.getElementById('editClubRoomOther');
+  other.style.display = isOther ? '' : 'none';
+});
+
+document.getElementById('saveClubEditBtn').addEventListener('click', async () => {
+  const id     = document.getElementById('editClubDocId').value;
+  const roomSel = document.getElementById('editClubRoom');
+  const room   = roomSel.value === 'other'
+    ? document.getElementById('editClubRoomOther').value.trim()
+    : roomSel.value;
+  const maxCap = parseInt(document.getElementById('editClubMaxCap').value);
+  const status = document.getElementById('editClubStatus').value;
+
+  if (!maxCap || maxCap < 1) { showToast('จำนวนที่นั่งไม่ถูกต้อง','error'); return; }
+
+  await db.collection(COL.CLUBS).doc(id).update({ room, maxCapacity: maxCap, status });
+  await writeAuditLog('edit_club', COL.CLUBS, id, { room, maxCapacity: maxCap, status });
+  document.getElementById('clubEditModal').classList.remove('open');
+  showToast('แก้ไขชุมนุมสำเร็จ','success');
+  loadClubs();
+});
+
+// Excel upload for clubs
+document.getElementById('uploadClubs').addEventListener('change', async function() {
+  const file = this.files[0]; if (!file) return;
+  const roundId = document.getElementById('clubRoundFilter').value;
+  if (!roundId) { showToast('กรุณาเลือกรอบก่อนอัปโหลด','error'); return; }
+  const data = await readExcel(file);
+  if (!data.length) return;
+  if (!await showConfirm({ title:'อัปโหลดชุมนุม', body:`พบ ${data.length} รายการ ต้องการอัปโหลดใช่หรือไม่?` })) return;
+  let count = 0;
+  for (const row of data) {
+    await db.collection(COL.CLUBS).add({
+      roundId, name: row[1]||'', description: row[2]||'',
+      teachers: [row[3]||'', row[4]||''].filter(Boolean),
+      code: String(row[5]||''), maxCapacity: parseInt(row[6])||30,
+      room: row[7]||'', enrolled: 0, type: 'general', status: 'approved',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    count++;
+  }
+  await writeAuditLog('bulk_upload_clubs', COL.CLUBS, roundId, { count });
+  showToast(`อัปโหลดสำเร็จ ${count} ชุมนุม`,'success');
+  loadClubs();
+  this.value = '';
+});
+
+document.getElementById('downloadClubTemplate').addEventListener('click', () => {
+  exportToExcel(
+    [['1','ชุมนุมตัวอย่าง','คำอธิบาย','ครูคนที่1','ครูคนที่2','C001','30','ห้อง101']],
+    ['ลำดับ','ชื่อชุมนุม','คำอธิบาย','ครูผู้สอนคนที่1','ครูผู้สอนคนที่2','รหัสชุมนุม','จำนวนนักเรียนที่รับ','สถานที่'],
+    'template_clubs.xlsx'
+  );
+});
+
+// ══════════════════════════════════════════════════════════════
+//  STUDENTS
+// ══════════════════════════════════════════════════════════════
+let allStudents = [], currentGradeFilter = 'all';
+
+async function loadStudents() {
+  const snap = await db.collection(COL.STUDENTS).orderBy('grade').orderBy('firstName').get();
+  allStudents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderStudentsTable();
+}
+
+// Grade tabs
+document.getElementById('gradeTabs').addEventListener('click', e => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  document.querySelectorAll('#gradeTabs .tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentGradeFilter = btn.dataset.grade;
+  renderStudentsTable();
+});
+
+document.getElementById('studentSearch').addEventListener('input', renderStudentsTable);
+
+function renderStudentsTable() {
+  const q = document.getElementById('studentSearch').value.toLowerCase();
+  const filtered = allStudents.filter(s =>
+    (currentGradeFilter === 'all' || String(s.grade) === currentGradeFilter) &&
+    (!q || `${s.firstName} ${s.lastName} ${s.studentId}`.toLowerCase().includes(q))
+  );
+  const paginator = createPaginator(filtered, 25, (items, tbody) => {
+    if (!items.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">ไม่พบนักเรียน</td></tr>'; return; }
+    tbody.innerHTML = items.map((s, i) => `
+      <tr>
+        <td>${i+1}</td>
+        <td>${escHtml(s.studentId)}</td>
+        <td>${escHtml(s.firstName)}</td>
+        <td>${escHtml(s.lastName)}</td>
+        <td>${gradeLabel(s.grade)}</td>
+        <td>${s.currentClub ? `<span class="badge badge-blue">${escHtml(s.currentClub)}</span>` : '<span class="badge badge-gray">ยังไม่ได้ลง</span>'}</td>
+        <td>
+          <button class="btn btn-ghost btn-sm" onclick="openEditStudent('${s.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteStudent('${s.id}','${escHtml(s.studentId)}')">🗑</button>
+        </td>
+      </tr>`).join('');
+  });
+  paginator.render(document.getElementById('studentsBody'), document.getElementById('studentPagination'));
+}
+
+document.getElementById('addStudentBtn').addEventListener('click', () => openEditStudent(null));
+document.getElementById('deleteGradeBtn').addEventListener('click', async () => {
+  const grade = currentGradeFilter;
+  if (grade === 'all') { showToast('กรุณาเลือกระดับชั้นก่อน','warning'); return; }
+  if (await showConfirm({ title:`ลบข้อมูลทั้ง ${gradeLabel(grade)}`, body:`ลบนักเรียนทั้งหมดใน ${gradeLabel(grade)} ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้`, type:'danger', confirmText:'ลบทั้งหมด' })) {
+    const toDelete = allStudents.filter(s => String(s.grade) === grade);
+    const batch = db.batch();
+    toDelete.forEach(s => batch.delete(db.collection(COL.STUDENTS).doc(s.id)));
+    await batch.commit();
+    await writeAuditLog('delete_grade', COL.STUDENTS, grade, { count: toDelete.length });
+    showToast(`ลบ ${gradeLabel(grade)} ทั้งหมด ${toDelete.length} คนสำเร็จ`,'success');
+    loadStudents();
+  }
+});
+
+function openEditStudent(docId) {
+  const s = docId ? allStudents.find(x => x.id === docId) : null;
+  document.getElementById('studentModalTitle').textContent = s ? 'แก้ไขข้อมูลนักเรียน' : 'เพิ่มนักเรียน';
+  document.getElementById('editStudentId').value = docId || '';
+  document.getElementById('sStudentId').value  = s?.studentId || '';
+  document.getElementById('sNationalId').value = s?.nationalId || '';
+  document.getElementById('sFirstName').value  = s?.firstName || '';
+  document.getElementById('sLastName').value   = s?.lastName || '';
+  document.getElementById('sGrade').value      = s?.grade || 1;
+  document.getElementById('studentModal').classList.add('open');
+}
+
+document.getElementById('saveStudentBtn').addEventListener('click', async () => {
+  const sid  = document.getElementById('sStudentId').value.trim();
+  const nid  = document.getElementById('sNationalId').value.trim();
+  const fn   = document.getElementById('sFirstName').value.trim();
+  const ln   = document.getElementById('sLastName').value.trim();
+  const grade = parseInt(document.getElementById('sGrade').value);
+  if (!sid || !nid || !fn || !ln) { showToast('กรุณากรอกข้อมูลให้ครบ','error'); return; }
+  const docId = document.getElementById('editStudentId').value;
+  const data  = { studentId: sid, nationalId: nid, firstName: fn, lastName: ln, grade };
+  if (docId) {
+    await db.collection(COL.STUDENTS).doc(docId).update(data);
+    await writeAuditLog('edit_student', COL.STUDENTS, docId, data);
+  } else {
+    const ref = await db.collection(COL.STUDENTS).add({ ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    await writeAuditLog('add_student', COL.STUDENTS, ref.id, data);
+  }
+  document.getElementById('studentModal').classList.remove('open');
+  showToast('บันทึกข้อมูลนักเรียนสำเร็จ','success');
+  loadStudents();
+});
+
+async function deleteStudent(docId, studentId) {
+  if (await showConfirm({ title:'ลบนักเรียน', body:`ลบนักเรียน <strong>${studentId}</strong> ออกจากระบบใช่หรือไม่?`, type:'danger', confirmText:'ลบ' })) {
+    await db.collection(COL.STUDENTS).doc(docId).delete();
+    await writeAuditLog('delete_student', COL.STUDENTS, docId, { studentId });
+    showToast('ลบนักเรียนสำเร็จ','success');
+    loadStudents();
+  }
+}
+
+// Upload students Excel
+document.getElementById('uploadStudents').addEventListener('change', async function() {
+  const file = this.files[0]; if (!file) return;
+  const data = await readExcel(file);
+  if (!await showConfirm({ title:'อัปโหลดนักเรียน', body:`พบ ${data.length} รายการ ต้องการอัปโหลดใช่หรือไม่?` })) return;
+  const batch = db.batch();
+  let count = 0;
+  for (const row of data) {
+    const ref = db.collection(COL.STUDENTS).doc();
+    batch.set(ref, {
+      studentId: String(row[1]||''), firstName: row[2]||'', lastName: row[3]||'',
+      grade: parseInt(row[4])||1, nationalId: String(row[5]||''),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    count++;
+    if (count % 400 === 0) { await batch.commit(); }
+  }
+  await batch.commit();
+  await writeAuditLog('bulk_upload_students', COL.STUDENTS, 'all', { count });
+  showToast(`อัปโหลดนักเรียน ${count} คนสำเร็จ`,'success');
+  loadStudents();
+  this.value = '';
+});
+
+document.getElementById('downloadStudentTemplate').addEventListener('click', () => {
+  exportToExcel(
+    [['1','67001','สมชาย','ใจดี','1','1234567890123']],
+    ['ลำดับ','รหัสนักเรียน','ชื่อ','นามสกุล','ระดับชั้น','เลขประจำตัวประชาชน'],
+    'template_students.xlsx'
+  );
+});
+
+// ══════════════════════════════════════════════════════════════
+//  TRACKING
+// ══════════════════════════════════════════════════════════════
+let trackingMode = 'notReg';
+async function loadTracking() { showTrackingTab(trackingMode); }
+
+async function showTrackingTab(mode) {
+  trackingMode = mode;
+  const content = document.getElementById('trackingContent');
+  content.innerHTML = '<div class="spinner"></div>';
+
+  const [studentsSnap, regSnap, clubsSnap] = await Promise.all([
+    db.collection(COL.STUDENTS).get(),
+    db.collection(COL.REGISTRATIONS).get(),
+    db.collection(COL.CLUBS).get()
+  ]);
+
+  const regMap = {}; // studentId → reg data
+  regSnap.docs.forEach(d => { const r = d.data(); regMap[r.studentId] = r; });
+
+  if (mode === 'notReg') {
+    const notRegistered = studentsSnap.docs.filter(d => !regMap[d.data().studentId]);
+    if (!notRegistered.length) {
+      content.innerHTML = '<div class="empty-state"><div class="empty-icon">🎉</div><p>นักเรียนทุกคนลงทะเบียนแล้ว!</p></div>';
+      return;
+    }
+    content.innerHTML = `<div class="table-wrap"><table>
+      <thead><tr><th>#</th><th>รหัสนักเรียน</th><th>ชื่อ-นามสกุล</th><th>ระดับชั้น</th></tr></thead>
+      <tbody>${notRegistered.map((d,i)=>{const s=d.data();return`<tr><td>${i+1}</td><td>${escHtml(s.studentId)}</td><td>${escHtml(s.firstName)} ${escHtml(s.lastName)}</td><td>${gradeLabel(s.grade)}</td></tr>`;}).join('')}</tbody>
+    </table></div><p class="text-muted mt-1">ยังไม่ลงทะเบียน: ${notRegistered.length} คน</p>`;
+
+  } else if (mode === 'reg') {
+    const registered = studentsSnap.docs.filter(d => regMap[d.data().studentId]);
+    content.innerHTML = `<div class="table-wrap"><table>
+      <thead><tr><th>#</th><th>รหัสนักเรียน</th><th>ชื่อ-นามสกุล</th><th>ระดับชั้น</th><th>ชุมนุมที่เลือก</th></tr></thead>
+      <tbody>${registered.map((d,i)=>{const s=d.data();const reg=regMap[s.studentId];
+        return`<tr><td>${i+1}</td><td>${escHtml(s.studentId)}</td><td>${escHtml(s.firstName)} ${escHtml(s.lastName)}</td><td>${gradeLabel(s.grade)}</td>
+        <td>${(reg?.clubs||[]).map(c=>`<span class="badge badge-green">${escHtml(c.name)}</span>`).join(' ')}</td></tr>`;}).join('')}
+      </tbody></table></div><p class="text-muted mt-1">ลงทะเบียนแล้ว: ${registered.length} คน</p>`;
+
+  } else { // teachers
+    const teacherSnap = await db.collection(COL.CLUBS).get();
+    const teacherMap = {};
+    teacherSnap.docs.forEach(d => {
+      const c = d.data();
+      (c.teachers||[]).forEach(t => { teacherMap[t] = teacherMap[t] || []; teacherMap[t].push(c.name); });
+    });
+    content.innerHTML = `<div class="table-wrap"><table>
+      <thead><tr><th>ชื่อครู</th><th>ชุมนุมที่เปิด</th><th>สถานะ</th></tr></thead>
+      <tbody>${Object.entries(teacherMap).map(([teacher, clubs])=>`<tr>
+        <td>${escHtml(teacher)}</td>
+        <td>${clubs.map(c=>`<span class="badge badge-blue">${escHtml(c)}</span>`).join(' ')}</td>
+        <td><span class="badge badge-green">เปิดแล้ว</span></td>
+      </tr>`).join('')}</tbody></table></div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  REPORTS
+// ══════════════════════════════════════════════════════════════
+document.getElementById('exportAllBtn').addEventListener('click', async () => {
+  const [studentsSnap, regSnap] = await Promise.all([
+    db.collection(COL.STUDENTS).orderBy('grade').orderBy('firstName').get(),
+    db.collection(COL.REGISTRATIONS).get()
+  ]);
+  const regMap = {};
+  regSnap.docs.forEach(d => { const r = d.data(); regMap[r.studentId] = r; });
+  const rows = studentsSnap.docs.map((d, i) => {
+    const s   = d.data();
+    const reg = regMap[s.studentId];
+    return [i+1, s.studentId, s.firstName, s.lastName, gradeLabel(s.grade), (reg?.clubs||[]).map(c=>c.name).join(', ') || 'ยังไม่ลงทะเบียน'];
+  });
+  exportToExcel(rows, ['ลำดับ','รหัสนักเรียน','ชื่อ','นามสกุล','ระดับชั้น','ชุมนุมที่ลงทะเบียน'], 'รายงานการลงทะเบียนชุมนุม_ทั้งโรงเรียน.xlsx');
+});
+
+document.getElementById('exportByGradeBtn').addEventListener('click', async () => {
+  const [studentsSnap, regSnap] = await Promise.all([
+    db.collection(COL.STUDENTS).orderBy('grade').orderBy('firstName').get(),
+    db.collection(COL.REGISTRATIONS).get()
+  ]);
+  const regMap = {};
+  regSnap.docs.forEach(d => { const r = d.data(); regMap[r.studentId] = r; });
+  const wb = XLSX.utils.book_new();
+  for (let g = 1; g <= 6; g++) {
+    const students = studentsSnap.docs.filter(d => d.data().grade === g);
+    const rows = [['ลำดับ','รหัสนักเรียน','ชื่อ','นามสกุล','ชุมนุม']];
+    students.forEach((d, i) => {
+      const s = d.data();
+      const reg = regMap[s.studentId];
+      rows.push([i+1, s.studentId, s.firstName, s.lastName, (reg?.clubs||[]).map(c=>c.name).join(', ') || 'ยังไม่ลงทะเบียน']);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), `ม.${g}`);
+  }
+  XLSX.writeFile(wb, 'รายงานการลงทะเบียนชุมนุม_แยกระดับชั้น.xlsx');
+});
+
+// ══════════════════════════════════════════════════════════════
+//  SECURITY
+// ══════════════════════════════════════════════════════════════
+document.getElementById('savePassBtn').addEventListener('click', async () => {
+  const newAdmin   = document.getElementById('newAdminPass').value;
+  const newTeacher = document.getElementById('newTeacherPin').value;
+  if (!newAdmin && !newTeacher) { showToast('กรุณากรอกรหัสผ่านใหม่อย่างน้อยหนึ่งรายการ','warning'); return; }
+  if (!await showConfirm({ title:'เปลี่ยนรหัสผ่าน', body:'ยืนยันการเปลี่ยนรหัสผ่านใช่หรือไม่?', type:'warning' })) return;
+  const updates = {};
+  if (newAdmin)   updates.adminPassword = newAdmin;
+  if (newTeacher) updates.teacherPin    = newTeacher;
+  await db.collection(COL.SETTINGS).doc(SETTINGS_DOC).set(updates, { merge: true });
+  await writeAuditLog('change_password', COL.SETTINGS, SETTINGS_DOC, { changed: Object.keys(updates) });
+  showToast('เปลี่ยนรหัสผ่านสำเร็จ','success');
+  document.getElementById('newAdminPass').value  = '';
+  document.getElementById('newTeacherPin').value = '';
+});
+
+// ══════════════════════════════════════════════════════════════
+//  AUDIT LOG
+// ══════════════════════════════════════════════════════════════
+async function loadAuditLog() {
+  const snap = await db.collection(COL.AUDIT_LOG).orderBy('timestamp','desc').limit(200).get();
+  const rows = snap.docs.map(d => d.data());
+  const paginator = createPaginator(rows, 25, (items, tbody) => {
+    tbody.innerHTML = items.map(r => `
+      <tr>
+        <td style="white-space:nowrap;font-size:0.8rem">${formatDate(r.timestamp)}</td>
+        <td>${escHtml(r.actor||'-')}</td>
+        <td><span class="badge badge-blue">${escHtml(r.action||'-')}</span></td>
+        <td>${escHtml(r.targetCollection||'')}/${escHtml(r.targetId||'')}</td>
+        <td style="font-size:0.8rem">${escHtml(JSON.stringify(r.details||{}))}</td>
+      </tr>`).join('');
+  });
+  paginator.render(document.getElementById('auditBody'), document.getElementById('auditPagination'));
+}
+
+// ══════════════════════════════════════════════════════════════
+//  HELPER: Read Excel
+// ══════════════════════════════════════════════════════════════
+function readExcel(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      resolve(data.slice(1).filter(row => row.some(Boolean))); // skip header
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// ── Init ──────────────────────────────────────────────────────
+loadOverview();
+</script>
+</body>
+</html>

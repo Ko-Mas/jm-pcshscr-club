@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เข้าสู่ระบบ – นักเรียน</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="login-wrap" style="background: linear-gradient(135deg,#FFF0F5 0%,#E8F8FF 100%); min-height:100vh;">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="logo-circle">🎒</div>
+      <h2>เข้าสู่ระบบนักเรียน</h2>
+      <p>ระบบลงทะเบียนชุมนุม PCSHSCR</p>
+    </div>
+
+    <div class="error-msg" id="errorMsg">รหัสนักเรียนหรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง</div>
+
+    <form id="loginForm">
+      <div class="form-group">
+        <label class="form-label">รหัสนักเรียน (Username)</label>
+        <div class="input-group">
+          <span class="input-icon">🎓</span>
+          <input type="text" id="studentId" placeholder="กรุณากรอกรหัสนักเรียน" required autocomplete="username">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">เลขประจำตัวประชาชน (Password)</label>
+        <div class="input-group">
+          <span class="input-icon">🔒</span>
+          <input type="password" id="nationalId" placeholder="กรุณากรอกเลขประจำตัวประชาชน" required autocomplete="current-password" maxlength="13">
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg" id="loginBtn">
+        เข้าสู่ระบบ
+      </button>
+    </form>
+
+    <div class="text-center mt-2">
+      <a href="index.html" class="text-muted" style="text-decoration:none;">← กลับหน้าหลัก</a>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+<script>
+const form   = document.getElementById('loginForm');
+const errMsg = document.getElementById('errorMsg');
+const btn    = document.getElementById('loginBtn');
+
+// If already logged in as student, redirect
+const s = getSession();
+if (s && s.role === 'student') window.location.href = 'student-dashboard.html';
+
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  const studentId  = document.getElementById('studentId').value.trim();
+  const nationalId = document.getElementById('nationalId').value.trim();
+  if (!studentId || !nationalId) return;
+
+  btn.disabled = true;
+  btn.textContent = 'กำลังตรวจสอบ...';
+  errMsg.classList.remove('show');
+
+  try {
+    const snap = await db.collection(COL.STUDENTS)
+      .where('studentId', '==', studentId)
+      .where('nationalId', '==', nationalId)
+      .limit(1)
+      .get();
+
+    if (snap.empty) {
+      errMsg.classList.add('show');
+    } else {
+      const data = { ...snap.docs[0].data(), docId: snap.docs[0].id };
+      saveSession('student', data);
+      window.location.href = 'student-dashboard.html';
+    }
+  } catch (err) {
+    showToast('เกิดข้อผิดพลาด: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'เข้าสู่ระบบ';
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เข้าสู่ระบบ – คุณครู</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="login-wrap" style="background:linear-gradient(135deg,#E8F8FF 0%,#FFF0F5 100%);min-height:100vh;">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="logo-circle">👩‍🏫</div>
+      <h2>เข้าสู่ระบบคุณครู</h2>
+      <p>ระบบจัดการชุมนุม PCSHSCR</p>
+    </div>
+
+    <div class="error-msg" id="errorMsg">รหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง</div>
+
+    <form id="loginForm">
+      <div class="form-group">
+        <label class="form-label">รหัสผ่านสำหรับคุณครู (PIN)</label>
+        <div class="input-group">
+          <span class="input-icon">🔒</span>
+          <input type="password" id="pinInput" placeholder="กรุณากรอกรหัสผ่าน" required maxlength="20" autocomplete="current-password">
+        </div>
+        <p class="text-muted mt-1" style="font-size:0.8rem">รหัสเริ่มต้น: 1234 (เปลี่ยนได้โดยแอดมิน)</p>
+      </div>
+      <button type="submit" class="btn btn-secondary btn-block btn-lg" id="loginBtn">เข้าสู่ระบบ</button>
+    </form>
+
+    <div class="text-center mt-2">
+      <a href="index.html" class="text-muted" style="text-decoration:none;">← กลับหน้าหลัก</a>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+<script>
+const s = getSession();
+if (s && s.role === 'teacher') window.location.href = 'teacher-dashboard.html';
+
+document.getElementById('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const pin = document.getElementById('pinInput').value;
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true; btn.textContent = 'กำลังตรวจสอบ...';
+  document.getElementById('errorMsg').classList.remove('show');
+  try {
+    const doc = await db.collection(COL.SETTINGS).doc(SETTINGS_DOC).get();
+    const settings = doc.exists ? doc.data() : {};
+    const teacherPin = settings.teacherPin || '1234';
+    if (pin === teacherPin) {
+      saveSession('teacher', { name: 'คุณครู' });
+      window.location.href = 'teacher-dashboard.html';
+    } else {
+      document.getElementById('errorMsg').classList.add('show');
+    }
+  } catch (err) {
+    showToast('เกิดข้อผิดพลาด: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ';
+  }
+});
+</script>
+</body>
+</html>
