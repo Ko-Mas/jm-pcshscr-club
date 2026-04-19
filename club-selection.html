@@ -272,6 +272,11 @@ async function toggleClub(clubId) {
     // Deselect
     delete selectedMap[clubId];
   } else {
+    // Check selection limit
+    if (Object.keys(selectedMap).length >= requiredCount) {
+      showToast(`เลือกได้สูงสุด ${requiredCount} ชุมนุมเท่านั้น`, 'warning');
+      return;
+    }
     // Check grade restriction
     const { restricted } = getGradeRestriction(club);
     if (restricted) {
@@ -301,7 +306,7 @@ function updateSummary() {
   const selected = Object.values(selectedMap);
   const count    = selected.length;
   document.getElementById('selectedCount').textContent = count;
-  document.getElementById('confirmBtn').disabled = count < requiredCount;
+  document.getElementById('confirmBtn').disabled = count !== requiredCount;
 
   const chips = document.getElementById('counterChips');
   if (count === 0) {
@@ -315,7 +320,7 @@ function updateSummary() {
 
 document.getElementById('confirmBtn').addEventListener('click', async () => {
   const selected = Object.values(selectedMap);
-  if (selected.length < requiredCount) return;
+  if (selected.length !== requiredCount) return;
 
   const ok = await showConfirm({
     title: 'ยืนยันการลงทะเบียน',
