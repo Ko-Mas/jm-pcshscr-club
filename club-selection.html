@@ -172,7 +172,52 @@ async function init() {
   allClubs = clubsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
   renderAll();
+  claimActiveSlot(); // non-blocking — slot management runs in background
 }
+
+// ── Active Slot Management ────────────────────────────────────
+let _heartbeatTimer = null;
+const _slotId = `${student.studentId}_${roundId}`;
+
+async function claimActiveSlot() {
+  try {
+    const slotRef = db.collection(COL.ACTIVE_SLOTS).doc(_slotId);
+    const existing = await slotRef.get();
+    if (!existing.exists) {
+      await slotRef.set({ studentId: student.studentId, roundId, lastHeartbeat: firebase.firestore.FieldValue.serverTimestamp() });
+    } else {
+      await slotRef.update({ lastHeartbeat: firebase.firestore.FieldValue.serverTimestamp() });
+    }
+    _heartbeatTimer = setInterval(async () => {
+      try { await slotRef.update({ lastHeartbeat: firebase.firestore.FieldValue.serverTimestamp() }); } catch(_) {}
+    }, HEARTBEAT_MS);
+  } catch(_) {}
+}
+
+async function releaseSlotAndAdmitNext() {
+  clearInterval(_heartbeatTimer);
+  try {
+    await db.collection(COL.ACTIVE_SLOTS).doc(_slotId).delete();
+    // Admit the oldest waiting entry for this round
+    const queueSnap = await db.collection(COL.WAITING_QUEUE).where('roundId', '==', roundId).get();
+    const waiting = queueSnap.docs
+      .filter(d => d.data().status === 'waiting')
+      .sort((a, b) => (a.data().joinedAt?.toMillis() || 0) - (b.data().joinedAt?.toMillis() || 0));
+    if (waiting.length > 0) {
+      const next = waiting[0];
+      const nextSlotRef = db.collection(COL.ACTIVE_SLOTS).doc(`${next.data().studentId}_${roundId}`);
+      await db.runTransaction(async tx => {
+        tx.set(nextSlotRef, { studentId: next.data().studentId, roundId, lastHeartbeat: firebase.firestore.FieldValue.serverTimestamp() });
+        tx.update(next.ref, { status: 'admitted' });
+      });
+    }
+  } catch(_) {}
+}
+
+window.addEventListener('pagehide', releaseSlotAndAdmitNext);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') releaseSlotAndAdmitNext();
+});
 
 function renderAll() {
   const search    = document.getElementById('searchInput').value.toLowerCase();
@@ -335,23 +380,29 @@ document.getElementById('confirmBtn').addEventListener('click', async () => {
 
   try {
     await db.runTransaction(async (tx) => {
-      // Verify seats are still available for all newly selected clubs
-      for (const club of selected) {
-        const clubRef = db.collection(COL.CLUBS).doc(club.id);
-        const clubDoc = await tx.get(clubRef);
-        if (!clubDoc.exists) throw new Error(`ไม่พบชุมนุม: ${club.name}`);
-        const data = clubDoc.data();
-        const wasSelected = existingRegDocId && (await db.collection(COL.REGISTRATIONS).doc(existingRegDocId).get()).data()?.clubs?.some(c => c.id === club.id);
-        if (!wasSelected && (data.enrolled || 0) >= data.maxCapacity) {
-          throw new Error(`ที่นั่งในชุมนุม "${club.name}" เต็มแล้วในขณะที่คุณทำรายการ`);
+      // ── READ PHASE: all tx.get() calls must finish before any writes ──
+      const clubRefs = selected.map(c => db.collection(COL.CLUBS).doc(c.id));
+      const clubDocs = await Promise.all(clubRefs.map(ref => tx.get(ref)));
+      const oldRegDoc = existingRegDocId
+        ? await tx.get(db.collection(COL.REGISTRATIONS).doc(existingRegDocId))
+        : null;
+
+      // ── VALIDATION PHASE ──
+      const oldClubIds = oldRegDoc?.data()?.clubs?.map(c => c.id) || [];
+      for (let i = 0; i < selected.length; i++) {
+        const doc = clubDocs[i];
+        if (!doc.exists) throw new Error(`ไม่พบชุมนุม: ${selected[i].name}`);
+        const data = doc.data();
+        const wasAlreadySelected = oldClubIds.includes(selected[i].id);
+        if (!wasAlreadySelected && (data.enrolled || 0) >= data.maxCapacity) {
+          throw new Error(`ขออภัย ที่นั่งในชุมนุม "${selected[i].name}" เต็มแล้วในขณะที่คุณทำรายการ`);
         }
       }
 
-      // Get old registration to decrement counts
-      if (existingRegDocId) {
-        const oldReg = await tx.get(db.collection(COL.REGISTRATIONS).doc(existingRegDocId));
-        const oldClubs = oldReg.data()?.clubs || [];
-        for (const old of oldClubs) {
+      // ── WRITE PHASE ──
+      // Decrement clubs that were removed from selection
+      if (oldRegDoc) {
+        for (const old of (oldRegDoc.data()?.clubs || [])) {
           if (!selected.find(c => c.id === old.id)) {
             tx.update(db.collection(COL.CLUBS).doc(old.id), {
               enrolled: firebase.firestore.FieldValue.increment(-1)
@@ -359,24 +410,17 @@ document.getElementById('confirmBtn').addEventListener('click', async () => {
           }
         }
       }
-
-      // Increment enrolled counts for newly added clubs
-      const existingIds = existingRegDocId
-        ? ((await db.collection(COL.REGISTRATIONS).doc(existingRegDocId).get()).data()?.clubs || []).map(c=>c.id)
-        : [];
-      for (const club of selected) {
-        if (!existingIds.includes(club.id)) {
-          tx.update(db.collection(COL.CLUBS).doc(club.id), {
-            enrolled: firebase.firestore.FieldValue.increment(1)
-          });
+      // Increment newly added clubs
+      for (let i = 0; i < selected.length; i++) {
+        if (!oldClubIds.includes(selected[i].id)) {
+          tx.update(clubRefs[i], { enrolled: firebase.firestore.FieldValue.increment(1) });
         }
       }
-
-      // Save registration
+      // Save registration document
       const regData = {
-        studentId:  student.studentId,
-        studentName:`${student.firstName} ${student.lastName}`,
-        grade:      student.grade,
+        studentId:   student.studentId,
+        studentName: `${student.firstName} ${student.lastName}`,
+        grade:       student.grade,
         roundId,
         clubs: selected.map(c => ({ id: c.id, name: c.name, code: c.code || '', type: c.type })),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()

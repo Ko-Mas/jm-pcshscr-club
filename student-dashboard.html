@@ -76,6 +76,78 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
 
 initDrawer();
 
+async function tryEnterRegistration(roundId, btn) {
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'กำลังตรวจสอบ...';
+  try {
+    // Load queue settings
+    const settingsDoc = await db.collection(COL.SETTINGS).doc(QUEUE_SETTINGS_DOC).get();
+    const maxConcurrent = settingsDoc.exists ? (settingsDoc.data().maxConcurrent || 30) : 30;
+    const now = Date.now();
+    const staleThreshold = firebase.firestore.Timestamp.fromMillis(now - SLOT_TTL_MS);
+
+    // Sweep stale active slots for this round (best-effort)
+    const allSlotsSnap = await db.collection(COL.ACTIVE_SLOTS).where('roundId', '==', roundId).get();
+    const staleSlots = allSlotsSnap.docs.filter(d =>
+      (d.data().lastHeartbeat?.toMillis() || 0) < now - SLOT_TTL_MS
+    );
+    if (staleSlots.length > 0) {
+      const batch = db.batch();
+      staleSlots.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+
+    const slotId = `${student.studentId}_${roundId}`;
+
+    // If student already has an active slot, skip queue
+    const ownSlot = await db.collection(COL.ACTIVE_SLOTS).doc(slotId).get();
+    if (ownSlot.exists) {
+      window.location.href = `club-selection.html?round=${roundId}`;
+      return;
+    }
+
+    // Count live active slots
+    const liveCount = allSlotsSnap.size - staleSlots.length;
+
+    if (liveCount < maxConcurrent) {
+      // Capacity available — claim slot and enter
+      await db.collection(COL.ACTIVE_SLOTS).doc(slotId).set({
+        studentId: student.studentId,
+        roundId,
+        lastHeartbeat: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      window.location.href = `club-selection.html?round=${roundId}`;
+    } else {
+      // At capacity — join waiting queue
+      const existingQueue = await db.collection(COL.WAITING_QUEUE)
+        .where('studentId', '==', student.studentId)
+        .where('roundId', '==', roundId)
+        .get();
+      // Find active waiting entry
+      const activeEntry = existingQueue.docs.find(d => d.data().status === 'waiting');
+      let queueDocId;
+      if (activeEntry) {
+        queueDocId = activeEntry.id;
+      } else {
+        const qRef = await db.collection(COL.WAITING_QUEUE).add({
+          studentId: student.studentId,
+          roundId,
+          joinedAt:  firebase.firestore.FieldValue.serverTimestamp(),
+          lastSeen:  firebase.firestore.FieldValue.serverTimestamp(),
+          status:    'waiting'
+        });
+        queueDocId = qRef.id;
+      }
+      window.location.href = `waiting-room.html?round=${roundId}&queue=${queueDocId}`;
+    }
+  } catch (err) {
+    showToast('เกิดข้อผิดพลาด: ' + err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
+}
+
 async function loadRounds() {
   // Refresh round statuses based on scheduled times
   const roundsSnap = await db.collection(COL.ROUNDS).orderBy('createdAt', 'desc').get();
@@ -150,7 +222,7 @@ async function loadRounds() {
         quotaNote = `<div style="margin-top:0.4rem;font-size:0.8rem;color:#388E3C;font-weight:600">✅ เลือกครบ ${required} ชุมนุมแล้ว</div>`;
       }
       actionBtn = `
-        <a href="club-selection.html?round=${round.id}" class="btn btn-primary btn-sm">${reg ? '✏️ แก้ไขชุมนุม' : '➕ สมัคร'}</a>
+        <button class="btn btn-primary btn-sm" onclick="tryEnterRegistration('${round.id}', this)">${reg ? '✏️ แก้ไขชุมนุม' : '➕ สมัคร'}</button>
         ${quotaNote}`;
     }
 

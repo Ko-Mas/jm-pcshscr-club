@@ -24,8 +24,15 @@ const COL = {
   CLUBS:         'clubs',
   STUDENTS:      'students',
   REGISTRATIONS: 'registrations',
-  AUDIT_LOG:     'auditLog'
+  AUDIT_LOG:     'auditLog',
+  ACTIVE_SLOTS:  'activeSlots',   // tracks users currently on club-selection
+  WAITING_QUEUE: 'waitingQueue'   // queue entries for users waiting to enter
 };
 
-// ── Default settings document ID ───────────────────────────
-const SETTINGS_DOC = 'global';
+// ── Default settings document IDs ──────────────────────────
+const SETTINGS_DOC       = 'global';
+const QUEUE_SETTINGS_DOC = 'queue';   // settings/queue
+
+// ── Queue / slot constants ──────────────────────────────────
+const SLOT_TTL_MS  = 90 * 1000;   // slot expires after 90 s without heartbeat
+const HEARTBEAT_MS = 25 * 1000;   // heartbeat interval

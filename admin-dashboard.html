@@ -54,6 +54,7 @@
       <li><a href="#" data-tab="reports">📥 ออกรายงาน</a></li>
       <li><a href="#" data-tab="security">🔒 รหัสผ่าน/ความปลอดภัย</a></li>
       <li><a href="#" data-tab="auditlog">📝 Audit Log</a></li>
+      <li><a href="#" data-tab="queue">🔢 คิวระบบ</a></li>
     </ul>
   </aside>
 
@@ -163,8 +164,11 @@
 
     <!-- ═══ SECURITY ══════════════════════════════════════════════ -->
     <div id="tab-security" class="tab-content" style="display:none">
-      <h2 style="margin-bottom:1.25rem;color:var(--mint-dark)">🔒 จัดการรหัสผ่าน</h2>
-      <div class="card" style="max-width:480px">
+      <h2 style="margin-bottom:1.25rem;color:var(--mint-dark)">🔒 การตั้งค่าระบบ</h2>
+
+      <!-- Password settings -->
+      <div class="card mb-3" style="max-width:480px">
+        <div class="section-title">🔑 จัดการรหัสผ่าน</div>
         <div class="form-group">
           <label class="form-label">รหัสผ่านแอดมิน (ใหม่)</label>
           <input type="password" class="form-control" id="newAdminPass" placeholder="ใส่รหัสผ่านใหม่">
@@ -174,6 +178,71 @@
           <input type="password" class="form-control" id="newTeacherPin" placeholder="ใส่รหัส PIN ครูใหม่">
         </div>
         <button class="btn btn-primary" id="savePassBtn">💾 บันทึกรหัสผ่าน</button>
+      </div>
+
+      <!-- Traffic threshold settings -->
+      <div class="card" style="max-width:480px">
+        <div class="section-title">🚦 ขีดจำกัดการเข้าใช้งานพร้อมกัน (Traffic Threshold)</div>
+        <p class="text-muted" style="font-size:0.85rem;margin-bottom:1rem">
+          จำนวนนักเรียนสูงสุดที่สามารถอยู่ในหน้าเลือกชุมนุมพร้อมกันได้<br>
+          นักเรียนที่เกินจำนวนนี้จะถูกส่งไปยังห้องรอคิวโดยอัตโนมัติ
+        </p>
+        <div class="form-group">
+          <label class="form-label">จำนวนผู้ใช้งานพร้อมกันสูงสุด <span style="color:red">*</span></label>
+          <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+            <input type="number" class="form-control" id="trafficThresholdInput"
+              min="1" max="1000" placeholder="เช่น 30"
+              style="max-width:140px"
+              oninput="validateThresholdInput(this)">
+            <span class="text-muted" style="font-size:0.85rem">คน</span>
+          </div>
+          <div id="thresholdError" style="color:#e53935;font-size:0.82rem;margin-top:0.35rem;display:none"></div>
+          <div id="thresholdCurrent" style="font-size:0.82rem;color:var(--text-light);margin-top:0.35rem"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+          <button class="btn btn-primary" id="saveThresholdBtn">💾 บันทึกค่า Threshold</button>
+          <span id="thresholdSavedMsg" style="display:none;color:#2E7D66;font-size:0.85rem;font-weight:600">✅ บันทึกสำเร็จแล้ว</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ QUEUE MONITOR ══════════════════════════════════════════ -->
+    <div id="tab-queue" class="tab-content" style="display:none">
+      <h2 style="margin-bottom:1.25rem;color:var(--mint-dark)">🔢 คิวระบบ (Waiting Room)</h2>
+
+      <!-- Inline limit control -->
+      <div class="card mb-3" style="max-width:520px">
+        <div class="section-title">🚦 ขีดจำกัดผู้ใช้งานพร้อมกัน (Active Slots Limit)</div>
+        <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-top:0.5rem">
+          <label class="form-label" style="margin:0;white-space:nowrap">สูงสุด:</label>
+          <input type="number" class="form-control" id="queueLimitInput"
+            min="1" max="1000" placeholder="30" style="max-width:100px">
+          <span class="text-muted" style="font-size:0.85rem">คน</span>
+          <button class="btn btn-primary btn-sm" id="saveQueueLimitBtn">💾 บันทึก</button>
+          <span id="queueLimitSavedMsg" style="display:none;color:#2E7D66;font-size:0.85rem;font-weight:600">✅ บันทึกสำเร็จ</span>
+        </div>
+      </div>
+
+      <!-- Live monitor stat cards -->
+      <div class="stat-cards mb-3" id="queueStatCards">
+        <div class="stat-card"><div class="spinner"></div></div>
+      </div>
+
+      <div class="flex gap-2 mb-3">
+        <button class="btn btn-secondary btn-sm" onclick="loadQueueMonitor()">🔄 รีเฟรช</button>
+        <button class="btn btn-danger btn-sm" id="clearQueueBtn">🗑 ล้างคิวทั้งหมด</button>
+        <button class="btn btn-danger btn-sm" id="clearSlotsBtn">🗑 ล้าง Active Slots</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div class="card">
+          <div class="section-title">👥 กำลังใช้งาน (Active Slots)</div>
+          <div id="activeSlotsBody"><div class="spinner"></div></div>
+        </div>
+        <div class="card">
+          <div class="section-title">⏳ รอคิว (Waiting Queue)</div>
+          <div id="waitingQueueBody"><div class="spinner"></div></div>
+        </div>
       </div>
     </div>
 
@@ -336,8 +405,9 @@ const tabLoaders = {
   students:  loadStudents,
   tracking:  loadTracking,
   reports:   () => {},
-  security:  () => {},
-  auditlog:  loadAuditLog
+  security:  loadSecuritySettings,
+  auditlog:  loadAuditLog,
+  queue:     loadQueueMonitor
 };
 
 // ── Logout ────────────────────────────────────────────────────
@@ -854,13 +924,15 @@ async function showTrackingTab(mode) {
 // ══════════════════════════════════════════════════════════════
 document.getElementById('exportAllBtn').addEventListener('click', async () => {
   const [studentsSnap, regSnap] = await Promise.all([
-    db.collection(COL.STUDENTS).orderBy('grade').orderBy('firstName').get(),
+    db.collection(COL.STUDENTS).get(),
     db.collection(COL.REGISTRATIONS).get()
   ]);
   const regMap = {};
   regSnap.docs.forEach(d => { const r = d.data(); regMap[r.studentId] = r; });
-  const rows = studentsSnap.docs.map((d, i) => {
-    const s   = d.data();
+  const sorted = studentsSnap.docs
+    .map(d => d.data())
+    .sort((a, b) => (Number(a.grade) - Number(b.grade)) || (a.firstName || '').localeCompare(b.firstName || '', 'th'));
+  const rows = sorted.map((s, i) => {
     const reg = regMap[s.studentId];
     return [i+1, s.studentId, s.firstName, s.lastName, gradeLabel(s.grade), (reg?.clubs||[]).map(c=>c.name).join(', ') || 'ยังไม่ลงทะเบียน'];
   });
@@ -869,17 +941,19 @@ document.getElementById('exportAllBtn').addEventListener('click', async () => {
 
 document.getElementById('exportByGradeBtn').addEventListener('click', async () => {
   const [studentsSnap, regSnap] = await Promise.all([
-    db.collection(COL.STUDENTS).orderBy('grade').orderBy('firstName').get(),
+    db.collection(COL.STUDENTS).get(),
     db.collection(COL.REGISTRATIONS).get()
   ]);
   const regMap = {};
   regSnap.docs.forEach(d => { const r = d.data(); regMap[r.studentId] = r; });
+  const allStudents = studentsSnap.docs
+    .map(d => d.data())
+    .sort((a, b) => (a.firstName || '').localeCompare(b.firstName || '', 'th'));
   const wb = XLSX.utils.book_new();
   for (let g = 1; g <= 6; g++) {
-    const students = studentsSnap.docs.filter(d => d.data().grade === g);
+    const students = allStudents.filter(s => Number(s.grade) === g);
     const rows = [['ลำดับ','รหัสนักเรียน','ชื่อ','นามสกุล','ชุมนุม']];
-    students.forEach((d, i) => {
-      const s = d.data();
+    students.forEach((s, i) => {
       const reg = regMap[s.studentId];
       rows.push([i+1, s.studentId, s.firstName, s.lastName, (reg?.clubs||[]).map(c=>c.name).join(', ') || 'ยังไม่ลงทะเบียน']);
     });
@@ -889,8 +963,63 @@ document.getElementById('exportByGradeBtn').addEventListener('click', async () =
 });
 
 // ══════════════════════════════════════════════════════════════
-//  SECURITY
+//  SECURITY & SETTINGS
 // ══════════════════════════════════════════════════════════════
+async function loadSecuritySettings() {
+  // Load current threshold value from Firestore
+  const doc = await db.collection(COL.SETTINGS).doc(QUEUE_SETTINGS_DOC).get();
+  const current = doc.exists ? (doc.data().maxConcurrent || 30) : 30;
+  document.getElementById('trafficThresholdInput').value = current;
+  document.getElementById('thresholdCurrent').textContent = `ค่าปัจจุบัน: ${current} คน`;
+  document.getElementById('thresholdSavedMsg').style.display = 'none';
+}
+
+function validateThresholdInput(input) {
+  const errEl = document.getElementById('thresholdError');
+  const val   = input.value.trim();
+  if (val === '') { errEl.style.display = 'none'; return true; }
+  const n = Number(val);
+  if (!Number.isInteger(n) || n < 1 || val.includes('.')) {
+    errEl.textContent = 'กรุณากรอกจำนวนเต็มบวกเท่านั้น (เช่น 30)';
+    errEl.style.display = '';
+    return false;
+  }
+  if (n > 1000) {
+    errEl.textContent = 'ค่าสูงสุดที่อนุญาตคือ 1,000 คน';
+    errEl.style.display = '';
+    return false;
+  }
+  errEl.style.display = 'none';
+  return true;
+}
+
+document.getElementById('saveThresholdBtn').addEventListener('click', async () => {
+  const input = document.getElementById('trafficThresholdInput');
+  if (!validateThresholdInput(input)) return;
+  const val = parseInt(input.value.trim(), 10);
+  if (!val || val < 1) {
+    document.getElementById('thresholdError').textContent = 'กรุณากรอกค่า Threshold';
+    document.getElementById('thresholdError').style.display = '';
+    return;
+  }
+  const btn = document.getElementById('saveThresholdBtn');
+  btn.disabled = true;
+  btn.textContent = 'กำลังบันทึก...';
+  try {
+    await db.collection(COL.SETTINGS).doc(QUEUE_SETTINGS_DOC).set({ maxConcurrent: val }, { merge: true });
+    await writeAuditLog('update_traffic_threshold', COL.SETTINGS, QUEUE_SETTINGS_DOC, { maxConcurrent: val });
+    document.getElementById('thresholdCurrent').textContent = `ค่าปัจจุบัน: ${val} คน`;
+    const savedMsg = document.getElementById('thresholdSavedMsg');
+    savedMsg.style.display = '';
+    setTimeout(() => { savedMsg.style.display = 'none'; }, 4000);
+  } catch (err) {
+    showToast('เกิดข้อผิดพลาด: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 บันทึกค่า Threshold';
+  }
+});
+
 document.getElementById('savePassBtn').addEventListener('click', async () => {
   const newAdmin   = document.getElementById('newAdminPass').value;
   const newTeacher = document.getElementById('newTeacherPin').value;
@@ -941,6 +1070,91 @@ function readExcel(file) {
     reader.readAsArrayBuffer(file);
   });
 }
+
+// ══════════════════════════════════════════════════════════════
+//  QUEUE MONITOR
+// ══════════════════════════════════════════════════════════════
+async function loadQueueMonitor() {
+  const now = Date.now();
+
+  // Load settings
+  const settingsDoc = await db.collection(COL.SETTINGS).doc(QUEUE_SETTINGS_DOC).get();
+  const maxConcurrent = settingsDoc.exists ? (settingsDoc.data().maxConcurrent || 30) : 30;
+  const queueLimitInput = document.getElementById('queueLimitInput');
+  if (queueLimitInput && !queueLimitInput.dataset.dirty) queueLimitInput.value = maxConcurrent;
+
+  // Load active slots & waiting queue
+  const [slotsSnap, queueSnap] = await Promise.all([
+    db.collection(COL.ACTIVE_SLOTS).get(),
+    db.collection(COL.WAITING_QUEUE).get()
+  ]);
+
+  const liveSlots  = slotsSnap.docs.filter(d => (d.data().lastHeartbeat?.toMillis() || 0) > now - SLOT_TTL_MS);
+  const staleSlots = slotsSnap.docs.filter(d => (d.data().lastHeartbeat?.toMillis() || 0) <= now - SLOT_TTL_MS);
+  const waiting    = queueSnap.docs.filter(d => d.data().status === 'waiting');
+  const admitted   = queueSnap.docs.filter(d => d.data().status === 'admitted');
+
+  document.getElementById('queueStatCards').innerHTML = `
+    <div class="stat-card"><div class="num" style="color:var(--mint-dark)">${liveSlots.length}</div><div class="lbl">กำลังใช้งาน</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--orange-dark)">${waiting.length}</div><div class="lbl">รอคิว</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--blue-dark)">${maxConcurrent}</div><div class="lbl">ความจุสูงสุด</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--pink-dark)">${staleSlots.length}</div><div class="lbl">Slot หมดอายุ</div></div>`;
+
+  // Active slots list
+  document.getElementById('activeSlotsBody').innerHTML = liveSlots.length
+    ? `<div style="font-size:0.85rem">${liveSlots.map(d => {
+        const r = d.data();
+        return `<div style="padding:0.4rem 0;border-bottom:1px solid var(--border)">${escHtml(r.studentId)} <span class="text-muted">(${escHtml(r.roundId?.slice(0,8))}...)</span></div>`;
+      }).join('')}</div>`
+    : '<p class="text-muted">ไม่มีผู้ใช้งานขณะนี้</p>';
+
+  // Waiting queue list
+  const sortedWaiting = waiting.sort((a, b) => (a.data().joinedAt?.toMillis() || 0) - (b.data().joinedAt?.toMillis() || 0));
+  document.getElementById('waitingQueueBody').innerHTML = sortedWaiting.length
+    ? `<div style="font-size:0.85rem">${sortedWaiting.map((d, i) => {
+        const r = d.data();
+        return `<div style="padding:0.4rem 0;border-bottom:1px solid var(--border)">
+          <span class="badge badge-orange">#${i+1}</span> ${escHtml(r.studentId)}
+          <span class="text-muted" style="font-size:0.78rem"> — ${formatDate(r.joinedAt)}</span>
+        </div>`;
+      }).join('')}</div>`
+    : '<p class="text-muted">ไม่มีคิวรอขณะนี้</p>';
+}
+
+document.getElementById('saveQueueLimitBtn').addEventListener('click', async () => {
+  const input = document.getElementById('queueLimitInput');
+  const val = parseInt(input.value, 10);
+  if (!val || val < 1 || val > 1000) { showToast('กรุณากรอกตัวเลข 1–1000', 'error'); return; }
+  input.dataset.dirty = '1';
+  await db.collection(COL.SETTINGS).doc(QUEUE_SETTINGS_DOC).set({ maxConcurrent: val }, { merge: true });
+  await db.collection(COL.AUDIT_LOG).add({
+    action: 'update_queue_limit', adminId: session.data.adminId || 'admin',
+    newValue: val, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  const msg = document.getElementById('queueLimitSavedMsg');
+  msg.style.display = '';
+  setTimeout(() => { msg.style.display = 'none'; delete input.dataset.dirty; loadQueueMonitor(); }, 2000);
+});
+
+document.getElementById('clearQueueBtn').addEventListener('click', async () => {
+  if (!await showConfirm({ title:'ล้างคิว', body:'ลบรายการรอคิวทั้งหมดใช่หรือไม่?', type:'danger', confirmText:'ล้างคิว' })) return;
+  const snap = await db.collection(COL.WAITING_QUEUE).get();
+  const batch = db.batch();
+  snap.docs.forEach(d => batch.delete(d.ref));
+  await batch.commit();
+  showToast('ล้างคิวสำเร็จ', 'success');
+  loadQueueMonitor();
+});
+
+document.getElementById('clearSlotsBtn').addEventListener('click', async () => {
+  if (!await showConfirm({ title:'ล้าง Active Slots', body:'ลบ active slots ทั้งหมดใช่หรือไม่?', type:'danger', confirmText:'ล้าง' })) return;
+  const snap = await db.collection(COL.ACTIVE_SLOTS).get();
+  const batch = db.batch();
+  snap.docs.forEach(d => batch.delete(d.ref));
+  await batch.commit();
+  showToast('ล้าง Active Slots สำเร็จ', 'success');
+  loadQueueMonitor();
+});
 
 // ── Init ──────────────────────────────────────────────────────
 loadOverview();
