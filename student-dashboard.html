@@ -86,8 +86,7 @@ async function loadRounds() {
   for (const round of rounds) {
     const shouldBeOpen =
       round.openAt?.toMillis() <= now &&
-      round.closeAt?.toMillis() >= now &&
-      round.studentRegOpen === true;
+      round.closeAt?.toMillis() >= now;
     if (round.isOpen !== shouldBeOpen) {
       await db.collection(COL.ROUNDS).doc(round.id).update({ isOpen: shouldBeOpen });
       round.isOpen = shouldBeOpen;

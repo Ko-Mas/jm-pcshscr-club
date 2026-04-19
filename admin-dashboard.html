@@ -97,8 +97,8 @@
         <select class="filter-select" id="clubRoundFilter"><option value="">ทุกรอบ</option></select>
       </div>
       <div class="table-wrap"><table>
-        <thead><tr><th>ชื่อชุมนุม</th><th>ประเภท</th><th>ครูที่ปรึกษา</th><th>ห้อง</th><th>ที่นั่ง</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
-        <tbody id="clubsBody"><tr><td colspan="7" class="text-center"><div class="spinner"></div></td></tr></tbody>
+        <thead><tr><th>ชื่อชุมนุม</th><th>ประเภท</th><th>ครูที่ปรึกษา</th><th>ห้อง</th><th>ที่นั่ง</th><th>จัดการ</th></tr></thead>
+        <tbody id="clubsBody"><tr><td colspan="6" class="text-center"><div class="spinner"></div></td></tr></tbody>
       </table></div>
       <div class="pagination" id="clubPagination"></div>
     </div>
@@ -132,8 +132,8 @@
       </div>
 
       <div class="table-wrap"><table>
-        <thead><tr><th>#</th><th>รหัสนักเรียน</th><th>ชื่อ</th><th>นามสกุล</th><th>ระดับชั้น</th><th>ชุมนุมปัจจุบัน</th><th>จัดการ</th></tr></thead>
-        <tbody id="studentsBody"><tr><td colspan="7" class="text-center"><div class="spinner"></div></td></tr></tbody>
+        <thead><tr><th>#</th><th>รหัสนักเรียน</th><th>ชื่อ</th><th>นามสกุล</th><th>เลขประจำตัวประชาชน</th><th>ระดับชั้น</th><th>ชุมนุมปัจจุบัน</th><th>จัดการ</th></tr></thead>
+        <tbody id="studentsBody"><tr><td colspan="8" class="text-center"><div class="spinner"></div></td></tr></tbody>
       </table></div>
       <div class="pagination" id="studentPagination"></div>
     </div>
@@ -291,13 +291,6 @@
     <div class="form-group">
       <label class="form-label">จำนวนที่นั่ง</label>
       <input type="number" class="form-control" id="editClubMaxCap" min="1" style="max-width:150px">
-    </div>
-    <div class="form-group">
-      <label class="form-label">สถานะ</label>
-      <select class="form-control" id="editClubStatus" style="max-width:200px">
-        <option value="approved">อนุมัติ</option>
-        <option value="pending">รออนุมัติ</option>
-      </select>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="document.getElementById('clubEditModal').classList.remove('open')">ยกเลิก</button>
@@ -514,7 +507,7 @@ function renderClubsTable() {
     (!round || c.roundId === round)
   );
   const paginator = createPaginator(filtered, 25, (items, tbody) => {
-    if (!items.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">ไม่พบชุมนุม</td></tr>'; return; }
+    if (!items.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">ไม่พบชุมนุม</td></tr>'; return; }
     tbody.innerHTML = items.map(c => `
       <tr>
         <td><strong>${escHtml(c.name)}</strong></td>
@@ -522,7 +515,6 @@ function renderClubsTable() {
         <td style="font-size:0.85rem">${escHtml((c.teachers||[]).join(', '))}</td>
         <td>${escHtml(c.room||'-')}</td>
         <td><span class="${(c.enrolled||0)>=(c.maxCapacity||30)?'badge badge-red':'badge badge-green'}">${c.enrolled||0}/${c.maxCapacity||30}</span></td>
-        <td>${c.status==='pending'?'<span class="badge badge-orange">รออนุมัติ</span>':'<span class="badge badge-green">อนุมัติ</span>'}</td>
         <td>
           <button class="btn btn-ghost btn-sm" onclick="editClub('${c.id}')">✏️</button>
           <button class="btn btn-danger btn-sm" onclick="deleteClub('${c.id}','${escHtml(c.name)}')">🗑</button>
@@ -546,18 +538,20 @@ async function deleteClub(id, name) {
   }
 }
 
-function editClub(id) {
+async function editClub(id) {
   const c = allClubs.find(x => x.id === id);
   if (!c) return;
 
   document.getElementById('editClubDocId').value = id;
   document.getElementById('editClubNameDisplay').value = c.name;
   document.getElementById('editClubMaxCap').value = c.maxCapacity || 30;
-  document.getElementById('editClubStatus').value = c.status || 'pending';
 
   const roomSel   = document.getElementById('editClubRoom');
   const roomOther = document.getElementById('editClubRoomOther');
-  const knownRooms = [...roomSel.options].map(o => o.value).filter(v => v && v !== 'other');
+
+  await applyRoomOccupancy(roomSel, c.roundId, id);
+
+  const knownRooms = [...roomSel.options].filter(o => o.value && o.value !== 'other').map(o => o.value);
   if (c.room && knownRooms.includes(c.room)) {
     roomSel.value = c.room;
     roomOther.style.display = 'none';
@@ -586,12 +580,11 @@ document.getElementById('saveClubEditBtn').addEventListener('click', async () =>
     ? document.getElementById('editClubRoomOther').value.trim()
     : roomSel.value;
   const maxCap = parseInt(document.getElementById('editClubMaxCap').value);
-  const status = document.getElementById('editClubStatus').value;
 
   if (!maxCap || maxCap < 1) { showToast('จำนวนที่นั่งไม่ถูกต้อง','error'); return; }
 
-  await db.collection(COL.CLUBS).doc(id).update({ room, maxCapacity: maxCap, status });
-  await writeAuditLog('edit_club', COL.CLUBS, id, { room, maxCapacity: maxCap, status });
+  await db.collection(COL.CLUBS).doc(id).update({ room, maxCapacity: maxCap });
+  await writeAuditLog('edit_club', COL.CLUBS, id, { room, maxCapacity: maxCap });
   document.getElementById('clubEditModal').classList.remove('open');
   showToast('แก้ไขชุมนุมสำเร็จ','success');
   loadClubs();
@@ -633,11 +626,16 @@ document.getElementById('downloadClubTemplate').addEventListener('click', () => 
 // ══════════════════════════════════════════════════════════════
 //  STUDENTS
 // ══════════════════════════════════════════════════════════════
-let allStudents = [], currentGradeFilter = 'all';
+let allStudents = [], currentGradeFilter = 'all', studentRegMap = {};
 
 async function loadStudents() {
-  const snap = await db.collection(COL.STUDENTS).orderBy('studentId').get();
+  const [snap, regSnap] = await Promise.all([
+    db.collection(COL.STUDENTS).orderBy('studentId').get(),
+    db.collection(COL.REGISTRATIONS).get()
+  ]);
   allStudents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  studentRegMap = {};
+  regSnap.docs.forEach(d => { const r = d.data(); studentRegMap[r.studentId] = r; });
   renderStudentsTable();
 }
 
@@ -656,26 +654,34 @@ document.getElementById('studentSearch').addEventListener('input', renderStudent
 function renderStudentsTable() {
   const q = document.getElementById('studentSearch').value.toLowerCase();
   const filtered = allStudents
-    .filter(s =>
-      (currentGradeFilter === 'all' || String(s.grade) === currentGradeFilter) &&
-      (!q || `${s.firstName} ${s.lastName} ${s.studentId}`.toLowerCase().includes(q))
-    )
+    .filter(s => {
+      const validGrade = [1,2,3,4,5,6].includes(Number(s.grade));
+      const gradeMatch = currentGradeFilter === 'all'
+        ? true
+        : validGrade && String(s.grade) === currentGradeFilter;
+      const searchMatch = !q || `${s.firstName} ${s.lastName} ${s.studentId} ${s.nationalId||''}`.toLowerCase().includes(q);
+      return gradeMatch && searchMatch;
+    })
     .sort((a, b) => String(a.studentId).localeCompare(String(b.studentId), undefined, { numeric: true }));
   const paginator = createPaginator(filtered, 25, (items, tbody) => {
-    if (!items.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">ไม่พบนักเรียน</td></tr>'; return; }
-    tbody.innerHTML = items.map((s, i) => `
-      <tr>
+    if (!items.length) { tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">ไม่พบนักเรียน</td></tr>'; return; }
+    tbody.innerHTML = items.map((s, i) => {
+      const unknownGrade = !s.grade || ![1,2,3,4,5,6].includes(Number(s.grade));
+      const namStyle = unknownGrade ? ' style="color:red;font-weight:600"' : '';
+      return `<tr>
         <td>${i+1}</td>
         <td>${escHtml(s.studentId)}</td>
-        <td>${escHtml(s.firstName)}</td>
-        <td>${escHtml(s.lastName)}</td>
-        <td>${gradeLabel(s.grade)}</td>
-        <td>${s.currentClub ? `<span class="badge badge-blue">${escHtml(s.currentClub)}</span>` : '<span class="badge badge-gray">ยังไม่ได้ลง</span>'}</td>
+        <td${namStyle}>${escHtml(s.firstName)}</td>
+        <td${namStyle}>${escHtml(s.lastName)}</td>
+        <td>${escHtml(s.nationalId||'-')}</td>
+        <td>${unknownGrade ? '' : gradeLabel(s.grade)}</td>
+        <td>${studentRegMap[s.studentId] ? `<span class="badge badge-blue">${escHtml((studentRegMap[s.studentId].clubs||[]).map(c=>c.name).join(', '))}</span>` : '<span class="badge badge-gray">ยังไม่ได้ลง</span>'}</td>
         <td>
           <button class="btn btn-ghost btn-sm" onclick="openEditStudent('${s.id}')">✏️</button>
           <button class="btn btn-danger btn-sm" onclick="deleteStudent('${s.id}','${escHtml(s.studentId)}')">🗑</button>
         </td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
   });
   paginator.render(document.getElementById('studentsBody'), document.getElementById('studentPagination'));
 }
@@ -742,6 +748,21 @@ document.getElementById('uploadStudents').addEventListener('change', async funct
   const file = this.files[0]; if (!file) return;
   const data = await readExcel(file);
   if (!await showConfirm({ title:'อัปโหลดนักเรียน', body:`พบ ${data.length} รายการ ต้องการอัปโหลดใช่หรือไม่?` })) return;
+  const GRADE_MAP = {
+    'มัธยมศึกษาปีที่ 1': 1, 'มัธยมศึกษาปีที่1': 1, 'ม.1': 1, 'ม1': 1,
+    'มัธยมศึกษาปีที่ 2': 2, 'มัธยมศึกษาปีที่2': 2, 'ม.2': 2, 'ม2': 2,
+    'มัธยมศึกษาปีที่ 3': 3, 'มัธยมศึกษาปีที่3': 3, 'ม.3': 3, 'ม3': 3,
+    'มัธยมศึกษาปีที่ 4': 4, 'มัธยมศึกษาปีที่4': 4, 'ม.4': 4, 'ม4': 4,
+    'มัธยมศึกษาปีที่ 5': 5, 'มัธยมศึกษาปีที่5': 5, 'ม.5': 5, 'ม5': 5,
+    'มัธยมศึกษาปีที่ 6': 6, 'มัธยมศึกษาปีที่6': 6, 'ม.6': 6, 'ม6': 6,
+  };
+  function parseGrade(raw) {
+    if (!raw && raw !== 0) return null;
+    const n = parseInt(raw);
+    if (!isNaN(n) && n >= 1 && n <= 6) return n;
+    return GRADE_MAP[String(raw).trim()] || null;
+  }
+
   let batch = db.batch();
   let count = 0;
   let batchCount = 0;
@@ -749,7 +770,7 @@ document.getElementById('uploadStudents').addEventListener('change', async funct
     const ref = db.collection(COL.STUDENTS).doc();
     batch.set(ref, {
       studentId: String(row[1]||''), firstName: row[2]||'', lastName: row[3]||'',
-      grade: parseInt(row[4])||1, nationalId: String(row[5]||''),
+      grade: parseGrade(row[4]), nationalId: String(row[5]||''),
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     count++;

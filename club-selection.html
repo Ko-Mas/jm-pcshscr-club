@@ -126,12 +126,19 @@ initDrawer();
 async function init() {
   // Load round
   const roundDoc = await db.collection(COL.ROUNDS).doc(roundId).get();
-  if (!roundDoc.exists || !roundDoc.data().isOpen) {
-    await showAlert({ title:'ปิดการลงทะเบียนแล้ว', body:'รอบนี้ปิดการลงทะเบียนแล้ว', icon:'🔴' });
+  if (!roundDoc.exists) {
+    await showAlert({ title:'ไม่พบรอบ', body:'ไม่พบข้อมูลรอบการลงทะเบียนนี้', icon:'🔴' });
     window.location.href = 'student-dashboard.html';
     return;
   }
   const round = roundDoc.data();
+  const now = Date.now();
+  const isRoundOpen = round.openAt?.toMillis() <= now && round.closeAt?.toMillis() >= now;
+  if (!isRoundOpen) {
+    await showAlert({ title:'ปิดการลงทะเบียนแล้ว', body:'รอบนี้ปิดการลงทะเบียนแล้ว', icon:'🔴' });
+    window.location.href = 'student-dashboard.html';
+    return;
+  }
   document.getElementById('roundName').textContent = round.name;
   requiredCount = round.requiredClubs || 3;
   document.getElementById('requiredCount').textContent = requiredCount;
@@ -196,6 +203,19 @@ function renderAll() {
   updateSummary();
 }
 
+function getGradeRestriction(club) {
+  const conditions = club.gradeConditions || [];
+  if (!conditions.length || conditions.includes('0')) return { restricted: false, gradeText: null };
+  if (conditions.includes('other')) {
+    return { restricted: false, gradeText: club.gradeOther ? `⚠️ เงื่อนไข: ${club.gradeOther}` : null };
+  }
+  const grades = conditions.filter(v => ['1','2','3','4','5','6'].includes(String(v)));
+  if (!grades.length) return { restricted: false, gradeText: null };
+  const label = grades.sort().map(g => `ม.${g}`).join(', ');
+  const allowed = grades.map(Number).includes(Number(student.grade));
+  return { restricted: !allowed, gradeText: `⚠️ รับเฉพาะ: ${label}` };
+}
+
 function renderClubCard(club) {
   const enrolled = club.enrolled || 0;
   const max      = club.maxCapacity || 30;
@@ -207,10 +227,13 @@ function renderClubCard(club) {
   const typeBadge = club.type === 'academic'
     ? `<span class="badge badge-blue">วิชาการ</span>`
     : `<span class="badge badge-orange">ทั่วไป</span>`;
+  const { restricted, gradeText } = getGradeRestriction(club);
 
   let btnHtml;
   if (isDuplicate) {
-    btnHtml = `<button class="btn btn-sm toggle-btn" disabled title="เคยเรียนชุมนุมนี้แล้ว" style="background:#e0e0e0;color:#888">เคยเรียนแล้ว</button>`;
+    btnHtml = `<button class="btn btn-sm toggle-btn" disabled style="background:#e0e0e0;color:#888">เคยเรียนแล้ว</button>`;
+  } else if (restricted) {
+    btnHtml = `<button class="btn btn-sm toggle-btn" disabled style="background:#e0e0e0;color:#888">ไม่อยู่ในเงื่อนไข</button>`;
   } else if (isFull && !isSelected) {
     btnHtml = `<button class="btn btn-sm toggle-btn" disabled style="background:#e0e0e0;color:#888">ที่นั่งเต็ม</button>`;
   } else if (isSelected) {
@@ -219,8 +242,12 @@ function renderClubCard(club) {
     btnHtml = `<button class="btn btn-orange btn-sm toggle-btn" data-club-id="${club.id}">สมัคร</button>`;
   }
 
+  const gradeNote = gradeText
+    ? `<div style="color:#e53935;font-size:0.82rem;font-weight:600;margin-top:0.4rem">${escHtml(gradeText)}</div>`
+    : '';
+
   return `
-    <div class="club-card${isSelected?' selected':''}${isFull&&!isSelected?' full':''}">
+    <div class="club-card${isSelected?' selected':''}${isFull&&!isSelected?' full':''}${restricted?' full':''}">
       <div class="club-card-header">
         <span class="club-code">${escHtml(club.code || '')}</span>
         ${typeBadge}
@@ -230,6 +257,7 @@ function renderClubCard(club) {
         <span>📍 ${escHtml(club.room || '-')}</span>
         <span>👨‍🏫 ${escHtml((club.teachers || []).join(', '))}</span>
       </div>
+      ${gradeNote}
       <div class="seat-bar"><div class="seat-bar-fill ${fillClass}" style="width:${fillPct}%"></div></div>
       <div class="seat-info">${enrolled}/${max} ที่นั่ง${isFull ? ' <strong style="color:#ff6b6b">เต็ม</strong>' : ''}</div>
       <div class="mt-1" style="text-align:right">${btnHtml}</div>
@@ -244,6 +272,12 @@ async function toggleClub(clubId) {
     // Deselect
     delete selectedMap[clubId];
   } else {
+    // Check grade restriction
+    const { restricted } = getGradeRestriction(club);
+    if (restricted) {
+      await showAlert({ title:'ไม่สามารถเลือกได้', body:'ชุมนุมนี้รับเฉพาะนักเรียนที่ระบุไว้เท่านั้น', icon:'⚠️' });
+      return;
+    }
     // Check duplicate
     if (previousClubNames.has(club.name)) {
       await showAlert({ title:'ไม่สามารถเลือกได้', body:'คุณเคยลงทะเบียนชุมนุมนี้แล้วในเทอมที่ผ่านมา', icon:'⚠️' });

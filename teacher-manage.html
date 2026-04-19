@@ -105,14 +105,17 @@
       </div>
     </div>
 
-    <!-- Student List -->
+    <!-- Current Members Table -->
     <div class="card mb-3">
-      <div class="section-title">🎒 รายชื่อนักเรียน</div>
+      <div class="flex justify-between align-center flex-wrap gap-1 mb-2">
+        <div class="section-title" style="margin-bottom:0">🎒 รายชื่อนักเรียนในชุมนุม</div>
+        <button class="btn btn-secondary btn-sm" id="exportBtn">📥 ดาวน์โหลดรายชื่อ Excel</button>
+      </div>
 
       <div class="search-bar mb-2">
         <div class="search-input-wrap">
           <span>🔍</span>
-          <input type="text" id="studentSearch" placeholder="ค้นหานักเรียน...">
+          <input type="text" id="studentSearch" placeholder="ค้นหานักเรียนในชุมนุม...">
         </div>
         <select class="filter-select" id="gradeFilter">
           <option value="">ทุกระดับชั้น</option>
@@ -120,19 +123,6 @@
           <option value="3">ม.3</option><option value="4">ม.4</option>
           <option value="5">ม.5</option><option value="6">ม.6</option>
         </select>
-      </div>
-
-      <div style="margin-bottom:1rem">
-        <button class="btn btn-success btn-sm" id="addStudentToggle">+ เพิ่มนักเรียน</button>
-        <button class="btn btn-secondary btn-sm" id="exportBtn">📥 ดาวน์โหลดรายชื่อ Excel</button>
-      </div>
-
-      <!-- Add student panel -->
-      <div id="addStudentPanel" style="display:none;background:var(--blue-light);padding:1rem;border-radius:var(--radius-sm);margin-bottom:1rem">
-        <div class="form-group mb-1">
-          <input type="text" class="form-control" id="searchAllStudents" placeholder="ค้นหาชื่อนักเรียนที่ต้องการเพิ่ม...">
-        </div>
-        <div id="searchResults" style="max-height:200px;overflow-y:auto"></div>
       </div>
 
       <div class="table-wrap">
@@ -146,6 +136,36 @@
         </table>
       </div>
       <div class="pagination" id="memberPagination"></div>
+    </div>
+
+    <!-- Add Students Table -->
+    <div class="card mb-3">
+      <div class="section-title">➕ เพิ่มนักเรียนเข้าชุมนุม</div>
+
+      <div class="search-bar mb-2">
+        <div class="search-input-wrap">
+          <span>🔍</span>
+          <input type="text" id="searchAllStudents" placeholder="ค้นหาชื่อ นามสกุล หรือรหัสนักเรียน...">
+        </div>
+        <select class="filter-select" id="addGradeFilter">
+          <option value="">ทุกระดับชั้น</option>
+          <option value="1">ม.1</option><option value="2">ม.2</option>
+          <option value="3">ม.3</option><option value="4">ม.4</option>
+          <option value="5">ม.5</option><option value="6">ม.6</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>#</th><th>รหัสนักเรียน</th><th>ชื่อ-นามสกุล</th><th>ระดับชั้น</th><th>สถานะชุมนุม</th><th>เพิ่ม</th></tr>
+          </thead>
+          <tbody id="addStudentBody">
+            <tr><td colspan="6" class="text-center text-muted">พิมพ์ค้นหานักเรียนที่ต้องการเพิ่ม</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="addStudentPagination"></div>
     </div>
 
     <div class="flex justify-between flex-wrap gap-1">
@@ -171,6 +191,7 @@ let clubDocId = null;
 let clubData  = null;
 let members   = []; // Array of {studentId, firstName, lastName, grade, regDocId}
 let allSystemStudents = [];
+let allRegMap = {}; // studentId → club name (for current round)
 
 // ── Auth Gate ────────────────────────────────────────────────
 document.getElementById('authBtn').addEventListener('click', async () => {
@@ -214,6 +235,14 @@ async function loadPanel() {
     const isOther = this.value === 'other';
     roomOther.style.display = isOther ? '' : 'none';
   });
+  await applyRoomOccupancy(roomSel, clubData.roundId, clubDocId);
+
+  // Resolve round name from its document ID
+  let roundName = '-';
+  if (clubData.roundId) {
+    const roundDoc = await db.collection(COL.ROUNDS).doc(clubData.roundId).get();
+    if (roundDoc.exists) roundName = roundDoc.data().name || clubData.roundId;
+  }
 
   // Readonly info
   document.getElementById('readonlyInfo').innerHTML = `
@@ -222,15 +251,18 @@ async function loadPanel() {
     <div><strong>สถานที่:</strong> ${escHtml(clubData.room || '-')}</div>
     <div><strong>ครูที่ปรึกษา:</strong> ${escHtml((clubData.teachers || []).join(', '))}</div>
     <div><strong>หลักการ:</strong> ${escHtml(clubData.rationale || '-')}</div>
-    <div><strong>รอบ:</strong> ${escHtml(clubData.roundId || '-')}</div>`;
+    <div><strong>รอบ:</strong> ${escHtml(roundName)}</div>`;
 
-  // Load members from registrations
+  // Load all registrations for this round; build member list and full reg map
   const regSnap = await db.collection(COL.REGISTRATIONS)
     .where('roundId', '==', clubData.roundId)
     .get();
   members = [];
+  allRegMap = {};
   regSnap.docs.forEach(doc => {
     const r = doc.data();
+    const clubName = (r.clubs || []).map(c => c.name).join(', ');
+    if (clubName) allRegMap[r.studentId] = clubName;
     if (r.clubs?.some(c => c.id === clubDocId)) {
       members.push({
         studentId: r.studentId,
@@ -243,9 +275,10 @@ async function loadPanel() {
   });
   renderMembers();
 
-  // Load all students for search
-  const allSnap = await db.collection(COL.STUDENTS).get();
+  // Load all students for the add-student table
+  const allSnap = await db.collection(COL.STUDENTS).orderBy('studentId').get();
   allSystemStudents = allSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderAddStudentTable();
 }
 
 function renderMembers() {
@@ -289,30 +322,59 @@ async function removeMember(studentId, regDocId) {
     await db.collection(COL.CLUBS).doc(clubDocId).update({ enrolled: firebase.firestore.FieldValue.increment(-1) });
     await writeAuditLog('remove_student_from_club', COL.CLUBS, clubDocId, { studentId });
     members = members.filter(m => m.studentId !== studentId);
+    delete allRegMap[studentId];
     renderMembers();
+    renderAddStudentTable();
     showToast('ลบรายชื่อนักเรียนสำเร็จ', 'success');
   } catch (err) { showToast(err.message, 'error'); }
 }
 
-// Add student search
-document.getElementById('addStudentToggle').addEventListener('click', () => {
-  const panel = document.getElementById('addStudentPanel');
-  panel.style.display = panel.style.display === 'none' ? '' : 'none';
-});
+function renderAddStudentTable() {
+  const q     = document.getElementById('searchAllStudents').value.toLowerCase();
+  const grade = document.getElementById('addGradeFilter').value;
+  const alreadyIn = new Set(members.map(m => m.studentId));
+  const filtered = allSystemStudents.filter(s =>
+    (!grade || String(s.grade) === grade) &&
+    (q.length >= 2
+      ? `${s.firstName} ${s.lastName} ${s.studentId}`.toLowerCase().includes(q)
+      : true)
+  );
+  const paginator = createPaginator(filtered, 25, (items, tbody) => {
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">ไม่พบนักเรียน</td></tr>';
+      return;
+    }
+    tbody.innerHTML = items.map((s, i) => {
+      const inThisClub   = alreadyIn.has(s.studentId);
+      const registeredAt = allRegMap[s.studentId];
+      const inOtherClub  = registeredAt && !inThisClub;
+      let statusCell, addCell;
+      if (inThisClub) {
+        statusCell = `<span class="badge badge-green">ชุมนุมนี้</span>`;
+        addCell    = `<span class="badge badge-green">อยู่แล้ว</span>`;
+      } else if (inOtherClub) {
+        statusCell = `<span class="badge badge-blue" title="${escHtml(registeredAt)}">${escHtml(registeredAt)}</span>`;
+        addCell    = `<button class="btn btn-success btn-sm" disabled title="ลงทะเบียนชุมนุมอื่นแล้ว">+ เพิ่ม</button>`;
+      } else {
+        statusCell = `<span class="badge badge-gray">ยังไม่ได้ลง</span>`;
+        addCell    = `<button class="btn btn-success btn-sm" onclick="addMember('${s.studentId}','${s.id}')">+ เพิ่ม</button>`;
+      }
+      return `<tr>
+        <td>${i+1}</td>
+        <td>${escHtml(s.studentId)}</td>
+        <td>${escHtml(s.firstName)} ${escHtml(s.lastName)}</td>
+        <td>${gradeLabel(s.grade)}</td>
+        <td>${statusCell}</td>
+        <td>${addCell}</td>
+      </tr>`;
+    }).join('');
+  });
+  paginator.render(document.getElementById('addStudentBody'), document.getElementById('addStudentPagination'));
+}
 
-document.getElementById('searchAllStudents').addEventListener('input', function() {
-  const q = this.value.toLowerCase();
-  const results = document.getElementById('searchResults');
-  if (q.length < 2) { results.innerHTML = ''; return; }
-  const matches = allSystemStudents.filter(s =>
-    `${s.firstName} ${s.lastName} ${s.studentId}`.toLowerCase().includes(q)
-  ).slice(0, 10);
-  results.innerHTML = matches.map(s => `
-    <div style="padding:0.5rem;cursor:pointer;border-radius:4px;display:flex;justify-content:space-between;align-items:center;background:white;margin-bottom:4px"
-      onclick="addMember('${s.studentId}','${s.id}')">
-      <span>${escHtml(s.firstName)} ${escHtml(s.lastName)} (${escHtml(s.studentId)}) – ${gradeLabel(s.grade)}</span>
-      <button class="btn btn-success btn-sm">+ เพิ่ม</button>
-    </div>`).join('') || '<p class="text-muted" style="padding:0.5rem">ไม่พบนักเรียน</p>';
+['searchAllStudents','addGradeFilter'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderAddStudentTable);
+  document.getElementById(id).addEventListener('change', renderAddStudentTable);
 });
 
 async function addMember(studentId, docId) {
@@ -340,7 +402,9 @@ async function addMember(studentId, docId) {
   await db.collection(COL.CLUBS).doc(clubDocId).update({ enrolled: firebase.firestore.FieldValue.increment(1) });
   await writeAuditLog('add_student_to_club', COL.CLUBS, clubDocId, { studentId });
   members.push({ studentId, firstName: sData.firstName, lastName: sData.lastName, grade: sData.grade, regDocId: 'temp' });
+  allRegMap[studentId] = clubData.name;
   renderMembers();
+  renderAddStudentTable();
   showToast('เพิ่มนักเรียนสำเร็จ', 'success');
 }
 

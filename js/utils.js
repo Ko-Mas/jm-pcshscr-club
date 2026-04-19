@@ -202,13 +202,40 @@ function escHtml(str) {
   return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Room Occupancy Helper ────────────────────────────────────
+// Marks occupied rooms in a <select> with "(club name)" and disables them.
+// excludeClubDocId: the club being edited — its own room stays selectable.
+async function applyRoomOccupancy(selectEl, roundId, excludeClubDocId = null) {
+  [...selectEl.options].forEach(opt => {
+    if (!opt.value || opt.value === 'other') return;
+    opt.disabled = false;
+    opt.textContent = opt.textContent.replace(/\s*\(.*\)$/, '');
+  });
+  if (!roundId) return;
+  const snap = await db.collection(COL.CLUBS).where('roundId', '==', roundId).get();
+  const roomMap = {};
+  snap.docs.forEach(d => {
+    if (excludeClubDocId && d.id === excludeClubDocId) return;
+    const c = d.data();
+    if (c.room) roomMap[c.room] = c.name;
+  });
+  [...selectEl.options].forEach(opt => {
+    if (!opt.value || opt.value === 'other') return;
+    const club = roomMap[opt.value];
+    if (club) {
+      opt.textContent = `${opt.textContent} (${club})`;
+      opt.disabled = true;
+    }
+  });
+}
+
 // ── Round Status Checker (replaces server cron) ─────────────
 async function refreshRoundStatus(roundId) {
   const doc = await db.collection(COL.ROUNDS).doc(roundId).get();
   if (!doc.exists) return;
   const d = doc.data();
   const now = Date.now();
-  const isOpen = d.openAt?.toMillis() <= now && d.closeAt?.toMillis() >= now && d.teacherEditOpen;
+  const isOpen = d.openAt?.toMillis() <= now && d.closeAt?.toMillis() >= now;
   if (d.isOpen !== isOpen) {
     await db.collection(COL.ROUNDS).doc(roundId).update({ isOpen });
   }

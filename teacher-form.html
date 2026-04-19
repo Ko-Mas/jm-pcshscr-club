@@ -170,17 +170,26 @@
     <div class="card mb-3">
       <div class="section-title">🎒 เพิ่มรายชื่อนักเรียนล่วงหน้า (ไม่บังคับ)</div>
 
-      <div class="form-group">
-        <label class="form-label">กรองดูนักเรียนตามห้อง</label>
-        <select class="form-control" id="gradeFilter">
-          <option value="">-- เลือกระดับชั้น --</option>
-          <option value="1">ม.1</option>
-          <option value="2">ม.2</option>
-          <option value="3">ม.3</option>
-          <option value="4">ม.4</option>
-          <option value="5">ม.5</option>
-          <option value="6">ม.6</option>
-        </select>
+      <div class="form-group" style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end">
+        <div style="flex:0 0 auto">
+          <label class="form-label">กรองตามระดับชั้น</label>
+          <select class="form-control" id="gradeFilter">
+            <option value="">-- เลือกระดับชั้น --</option>
+            <option value="1">ม.1</option>
+            <option value="2">ม.2</option>
+            <option value="3">ม.3</option>
+            <option value="4">ม.4</option>
+            <option value="5">ม.5</option>
+            <option value="6">ม.6</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:200px">
+          <label class="form-label">ค้นหานักเรียน</label>
+          <div class="search-input-wrap">
+            <span>🔍</span>
+            <input type="text" id="studentSearchBox" placeholder="ชื่อ, นามสกุล, หรือรหัสนักเรียน...">
+          </div>
+        </div>
       </div>
 
       <div class="table-wrap">
@@ -226,25 +235,33 @@
 requireRole('teacher', 'teacher-login.html');
 initDrawer();
 
-let preAddedStudents = {}; // studentId → student data
-let allStudentsData  = [];
+let preAddedStudents  = {}; // studentId → student data
+let allStudentsData   = [];
+let registrationsMap  = {}; // studentId → club name (for selected round)
 
 // ── Load rounds for dropdown ─────────────────────────────────
 async function loadRounds() {
   const snap = await db.collection(COL.ROUNDS)
-    .where('teacherEditOpen', '==', true)
-    .orderBy('createdAt', 'desc').get();
+    .where('teacherEditOpen', '==', true).get();
   const sel = document.getElementById('roundId');
   if (snap.empty) {
     sel.innerHTML = '<option value="">ไม่มีรอบที่เปิดรับ</option>';
     return;
   }
-  snap.docs.forEach(d => {
+  const rounds = snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+  rounds.forEach(r => {
     const opt = document.createElement('option');
-    opt.value = d.id;
-    opt.textContent = d.data().name;
+    opt.value = r.id;
+    opt.textContent = r.name;
     sel.appendChild(opt);
   });
+  // Auto-select first round and apply room occupancy immediately
+  if (rounds.length > 0) {
+    sel.value = rounds[0].id;
+    await applyRoomOccupancy(document.getElementById('roomSelect'), rounds[0].id, null);
+  }
 }
 
 // ── Dynamic objectives ───────────────────────────────────────
@@ -288,6 +305,10 @@ document.getElementById('roomSelect').addEventListener('change', function() {
   other.required = isOther;
 });
 
+document.getElementById('roundId').addEventListener('change', async function() {
+  await applyRoomOccupancy(document.getElementById('roomSelect'), this.value, null);
+});
+
 // ── Grade conditions ─────────────────────────────────────────
 document.querySelectorAll('input[name="grades"]').forEach(cb => {
   cb.addEventListener('change', () => {
@@ -297,34 +318,71 @@ document.querySelectorAll('input[name="grades"]').forEach(cb => {
 });
 
 // ── Load students by grade ───────────────────────────────────
+document.getElementById('studentSearchBox').addEventListener('input', renderStudentTable);
+
 document.getElementById('gradeFilter').addEventListener('change', async function() {
   const grade = this.value;
-  if (!grade) return;
-  const snap = await db.collection(COL.STUDENTS).where('grade', '==', parseInt(grade)).orderBy('firstName').get();
-  allStudentsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  document.getElementById('studentSearchBox').value = '';
+  if (!grade) { allStudentsData = []; registrationsMap = {}; renderStudentTable(); return; }
+
+  const roundId = document.getElementById('roundId').value;
+
+  const studentsSnap = await db.collection(COL.STUDENTS).where('grade', '==', parseInt(grade)).get();
+  allStudentsData = studentsSnap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => String(a.studentId).localeCompare(String(b.studentId), undefined, { numeric: true }));
+
+  // Query registrations by studentId (in chunks of 30) — avoids roundId type mismatch
+  registrationsMap = {};
+  if (roundId && allStudentsData.length > 0) {
+    const ids = allStudentsData.map(s => String(s.studentId));
+    for (let i = 0; i < ids.length; i += 30) {
+      const chunk = ids.slice(i, i + 30);
+      const snap = await db.collection(COL.REGISTRATIONS)
+        .where('studentId', 'in', chunk).get();
+      snap.docs.forEach(d => {
+        const r = d.data();
+        if (String(r.roundId) === String(roundId)) {
+          const clubName = (r.clubs || [])[0]?.name || 'ลงทะเบียนแล้ว';
+          registrationsMap[String(r.studentId)] = clubName;
+        }
+      });
+    }
+  }
+
   renderStudentTable();
 });
 
 function renderStudentTable() {
-  const paginator = createPaginator(allStudentsData, 20, (items, container) => {
+  const q = (document.getElementById('studentSearchBox')?.value || '').toLowerCase().trim();
+  const display = q
+    ? allStudentsData.filter(s =>
+        `${s.firstName} ${s.lastName} ${s.studentId}`.toLowerCase().includes(q))
+    : allStudentsData;
+  const paginator = createPaginator(display, 20, (items, container) => {
     if (!items.length) {
       container.innerHTML = '<tr><td colspan="6" class="text-center text-muted">ไม่พบนักเรียน</td></tr>';
       return;
     }
     container.innerHTML = items.map((s, i) => {
-      const isAdded = !!preAddedStudents[s.studentId];
+      const isAdded = !!preAddedStudents[String(s.studentId)];
+      const regClub = registrationsMap[String(s.studentId)];
+      const alreadyReg = !!regClub && !isAdded;
+      const statusCell = regClub
+        ? `<span class="badge badge-orange">${escHtml(regClub)}</span>`
+        : '<span class="badge badge-gray">ยังไม่ได้ลง</span>';
+      const btnHtml = isAdded
+        ? `<button type="button" class="btn btn-sm btn-danger" onclick="togglePreAdd('${s.studentId}')">✕ ลบ</button>`
+        : alreadyReg
+          ? `<button type="button" class="btn btn-sm" disabled style="background:#e0e0e0;color:#888">ลงทะเบียนแล้ว</button>`
+          : `<button type="button" class="btn btn-sm btn-success" onclick="togglePreAdd('${s.studentId}')">+ เพิ่ม</button>`;
       return `<tr>
         <td>${i+1}</td>
         <td>${escHtml(s.studentId)}</td>
         <td>${escHtml(s.firstName)} ${escHtml(s.lastName)}</td>
         <td>${gradeLabel(s.grade)}</td>
-        <td>${s.currentClub ? `<span class="badge badge-orange">${escHtml(s.currentClub)}</span>` : '<span class="badge badge-gray">ยังไม่ได้ลง</span>'}</td>
-        <td>
-          <button type="button" class="btn btn-sm ${isAdded?'btn-danger':'btn-success'}"
-            onclick="togglePreAdd('${s.studentId}')">
-            ${isAdded ? '✕ ลบ' : '+ เพิ่ม'}
-          </button>
-        </td>
+        <td>${statusCell}</td>
+        <td>${btnHtml}</td>
       </tr>`;
     }).join('');
   }, container => document.getElementById('studentsBody'));
@@ -337,6 +395,10 @@ function togglePreAdd(studentId) {
   if (preAddedStudents[studentId]) {
     delete preAddedStudents[studentId];
   } else {
+    if (registrationsMap[String(studentId)]) {
+      showToast(`นักเรียนคนนี้ลงทะเบียนชุมนุม "${registrationsMap[String(studentId)]}" แล้ว`, 'error');
+      return;
+    }
     preAddedStudents[studentId] = s;
   }
   renderPreAddedChips();
@@ -419,7 +481,7 @@ document.getElementById('clubForm').addEventListener('submit', async e => {
       password:    document.getElementById('clubPassword').value,
       enrolled:    0,
       preAddedStudents: Object.keys(preAddedStudents),
-      status: 'pending',
+      status: 'approved',
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
@@ -443,7 +505,7 @@ document.getElementById('clubForm').addEventListener('submit', async e => {
     }
 
     await writeAuditLog('create_club', COL.CLUBS, docRef.id, { name: clubData.name });
-    await showAlert({ title:'ยื่นคำขอสำเร็จ!', body:'ข้อมูลชุมนุมถูกส่งเข้าระบบแล้ว รอการอนุมัติจากแอดมิน', icon:'✅' });
+    await showAlert({ title:'เปิดชุมนุมสำเร็จ!', body:'ข้อมูลชุมนุมถูกส่งเข้าระบบเรียบร้อยแล้ว', icon:'✅' });
     window.location.href = 'teacher-dashboard.html';
 
   } catch (err) {
