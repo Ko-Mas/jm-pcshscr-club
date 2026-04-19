@@ -65,7 +65,7 @@ if (!session) throw new Error('no session');
 
 const student = session.data;
 document.getElementById('welcomeMsg').textContent =
-  `ยินดีต้อนรับ ${student.firstName} ${student.lastName} (${student.studentId})`;
+  `ยินดีต้อนรับ ${student.firstName} ${student.lastName} ระดับชั้น ${gradeLabel(student.grade)} (รหัส ${student.studentId})`;
 
 document.getElementById('logoutBtn').addEventListener('click', async () => {
   if (await showConfirm({ title:'ออกจากระบบ', body:'คุณต้องการออกจากระบบใช่หรือไม่?', type:'warning' })) {
@@ -138,7 +138,20 @@ async function loadRounds() {
 
     let actionBtn = '';
     if (round.isOpen) {
-      actionBtn = `<a href="club-selection.html?round=${round.id}" class="btn btn-primary btn-sm">${reg ? '✏️ แก้ไขชุมนุม' : '➕ สมัคร'}</a>`;
+      const required  = round.requiredClubs || 3;
+      const selected  = reg?.clubs?.length || 0;
+      const remaining = required - selected;
+      let quotaNote = '';
+      if (selected === 0) {
+        quotaNote = `<div style="margin-top:0.4rem;font-size:0.8rem;color:#1565C0;font-weight:600">📋 ต้องเลือก ${required} ชุมนุม</div>`;
+      } else if (remaining > 0) {
+        quotaNote = `<div style="margin-top:0.4rem;font-size:0.8rem;color:#2E7D66;font-weight:600">⏳ เลือกแล้ว ${selected}/${required} — ต้องเลือกเพิ่มอีก ${remaining} ชุมนุม</div>`;
+      } else {
+        quotaNote = `<div style="margin-top:0.4rem;font-size:0.8rem;color:#388E3C;font-weight:600">✅ เลือกครบ ${required} ชุมนุมแล้ว</div>`;
+      }
+      actionBtn = `
+        <a href="club-selection.html?round=${round.id}" class="btn btn-primary btn-sm">${reg ? '✏️ แก้ไขชุมนุม' : '➕ สมัคร'}</a>
+        ${quotaNote}`;
     }
 
     return `
