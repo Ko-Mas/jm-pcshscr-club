@@ -70,7 +70,7 @@ document.getElementById('welcomeMsg').textContent =
 document.getElementById('logoutBtn').addEventListener('click', async () => {
   if (await showConfirm({ title:'ออกจากระบบ', body:'คุณต้องการออกจากระบบใช่หรือไม่?', type:'warning' })) {
     clearSession();
-    window.location.href = 'student-login.html';
+    window.location.href = 'index.html';
   }
 });
 

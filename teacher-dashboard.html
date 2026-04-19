@@ -78,7 +78,7 @@ requireRole('teacher', 'teacher-login.html');
 initDrawer();
 document.getElementById('logoutBtn').addEventListener('click', async () => {
   if (await showConfirm({ title:'ออกจากระบบ', body:'คุณต้องการออกจากระบบใช่หรือไม่?', type:'warning' })) {
-    clearSession(); window.location.href = 'teacher-login.html';
+    clearSession(); window.location.href = 'index.html';
   }
 });
 </script>
