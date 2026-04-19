@@ -636,7 +636,7 @@ document.getElementById('downloadClubTemplate').addEventListener('click', () => 
 let allStudents = [], currentGradeFilter = 'all';
 
 async function loadStudents() {
-  const snap = await db.collection(COL.STUDENTS).orderBy('grade').orderBy('firstName').get();
+  const snap = await db.collection(COL.STUDENTS).orderBy('studentId').get();
   allStudents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderStudentsTable();
 }
@@ -655,10 +655,12 @@ document.getElementById('studentSearch').addEventListener('input', renderStudent
 
 function renderStudentsTable() {
   const q = document.getElementById('studentSearch').value.toLowerCase();
-  const filtered = allStudents.filter(s =>
-    (currentGradeFilter === 'all' || String(s.grade) === currentGradeFilter) &&
-    (!q || `${s.firstName} ${s.lastName} ${s.studentId}`.toLowerCase().includes(q))
-  );
+  const filtered = allStudents
+    .filter(s =>
+      (currentGradeFilter === 'all' || String(s.grade) === currentGradeFilter) &&
+      (!q || `${s.firstName} ${s.lastName} ${s.studentId}`.toLowerCase().includes(q))
+    )
+    .sort((a, b) => String(a.studentId).localeCompare(String(b.studentId), undefined, { numeric: true }));
   const paginator = createPaginator(filtered, 25, (items, tbody) => {
     if (!items.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">ไม่พบนักเรียน</td></tr>'; return; }
     tbody.innerHTML = items.map((s, i) => `
@@ -740,8 +742,9 @@ document.getElementById('uploadStudents').addEventListener('change', async funct
   const file = this.files[0]; if (!file) return;
   const data = await readExcel(file);
   if (!await showConfirm({ title:'อัปโหลดนักเรียน', body:`พบ ${data.length} รายการ ต้องการอัปโหลดใช่หรือไม่?` })) return;
-  const batch = db.batch();
+  let batch = db.batch();
   let count = 0;
+  let batchCount = 0;
   for (const row of data) {
     const ref = db.collection(COL.STUDENTS).doc();
     batch.set(ref, {
@@ -750,9 +753,10 @@ document.getElementById('uploadStudents').addEventListener('change', async funct
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     count++;
-    if (count % 400 === 0) { await batch.commit(); }
+    batchCount++;
+    if (batchCount === 400) { await batch.commit(); batch = db.batch(); batchCount = 0; }
   }
-  await batch.commit();
+  if (batchCount > 0) await batch.commit();
   await writeAuditLog('bulk_upload_students', COL.STUDENTS, 'all', { count });
   showToast(`อัปโหลดนักเรียน ${count} คนสำเร็จ`,'success');
   loadStudents();
